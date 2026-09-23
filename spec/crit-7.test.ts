@@ -177,6 +177,37 @@ describe("course summaries: one click to Programs and Courses", () => {
   });
 });
 
+describe("where: each real class shows its building on a map", () => {
+  // lat/long and room pages as ANU's campus map gives them (23 Sep 2026)
+  const WHERE = [
+    { id: "PHIL1005-LecA-01", building: "153", marker: "-35.276928,149.121926", anu: "https://www.anu.edu.au/maps/lowitja-odonoghue-cultural-centre/cultural-centre-manning-clark-hall-104" },
+    { id: "COMP3900-LecA-01", building: "153", marker: "-35.276928,149.121926", anu: "https://www.anu.edu.au/maps/lowitja-odonoghue-cultural-centre/cultural-centre-cinema-102" },
+    { id: "COMP4020-TutA-02", building: "155", marker: "-35.277786,149.120685", anu: "https://www.anu.edu.au/maps/marie-reay-teaching-centre/marie-reay-403" },
+    { id: "PHIL1005-TutA-07", building: "24", marker: "-35.277985,149.123419", anu: "https://www.anu.edu.au/maps/copland-building/copland-g39" },
+    { id: "COMP4020-LecA-01", building: "95", marker: "-35.273661,149.120763", anu: "https://www.anu.edu.au/maps/fulton-muir-building" },
+    { id: "COMP3900-TutA-07", building: "95", marker: "-35.273661,149.120763", anu: "https://www.anu.edu.au/maps/fulton-muir-building" },
+  ];
+  for (const w of WHERE) {
+    it(`${w.id}: building ${w.building}`, async () => {
+      const html = await page(`/activities/${w.id}/`);
+      expect(html).toContain(`data-building="${w.building}"`);
+      expect(html).toMatch(new RegExp(`<iframe[^>]*title="Map: [^"]+"[^>]*src="https://www\\.openstreetmap\\.org/export/embed\\.html\\?[^"]*marker=${w.marker}"`));
+      expect(html).toContain(`href="${w.anu}"`);
+      expect(html).toContain(`destination=${w.marker}`);
+    });
+  }
+
+  it("shows one map for a tutorial and its drop-in in the same room", async () => {
+    expect((await page("/activities/COMP3900-TutA-07/")).match(/<iframe/g)).toHaveLength(1);
+  });
+
+  it("shows no map for sample data", async () => {
+    const html = await page("/activities/COMP3500-LecA-01/");
+    expect(html).not.toContain("<iframe");
+    expect(html).toContain("no real room");
+  });
+});
+
 describe("quick access: the saved home view persists", () => {
   it("opens to the week by default, and to Today once saved", async () => {
     expect(await page("/")).toContain('data-view="week"');

@@ -5,6 +5,7 @@
 import CourseSummaryLink from "../../components/CourseSummaryLink.astro";
 import Layout from "../../components/Layout.astro";
 import { findActivity } from "../../lib/db";
+import { directionsUrl, osmEmbedUrl, placeFor } from "../../lib/places";
 import {
   SEMESTER,
   canberraNow,
@@ -29,6 +30,9 @@ const waiting = view.waiting?.id === activity.id;
 const status = held ? "allocated" : waiting ? "pending" : "unallocated";
 const statusText = held ? "Your allocated time" : waiting ? "You're on the wait list" : "Another option in this group";
 const today = canberraNow(new Date()).date;
+// one map per distinct room (a tutorial and its drop-in share one)
+const rooms = activity.source === "mytt" ? [...new Set(activity.sessions.map((s) => s.location))] : [];
+const places = rooms.map((location) => ({ location, place: placeFor(location) }));
 const dm = (d: string) => {
   const [, m, day] = d.split("-");
   return `${Number(day)}/${Number(m)}`;
@@ -138,6 +142,51 @@ const long = (d: string) =>
       })
     }
   </div>
+
+  <section class="card where" aria-labelledby="where-h">
+    <h2 id="where-h">Where</h2>
+    {
+      activity.source !== "mytt" ? (
+        <p class="muted">Sample data has no real room, so there's no map.</p>
+      ) : (
+        places.map(({ location, place }) =>
+          place ? (
+            <div class="place" data-building={place.number}>
+              <div class="place-text">
+                <h3>{place.building}</h3>
+                <p>
+                  Building {place.number} · {location.split("_")[0]}
+                </p>
+                <p class="muted">{location}</p>
+                <ul class="place-links">
+                  <li>
+                    <a class="link-target" href={place.mapUrl} target="_blank" rel="noopener" data-map="anu">
+                      ANU campus map<span class="visually-hidden"> for {location.split("_")[0]}, opens in a new tab</span> ↗
+                    </a>
+                  </li>
+                  <li>
+                    <a class="link-target" href={directionsUrl(place)} target="_blank" rel="noopener" data-map="directions">
+                      Walking directions<span class="visually-hidden"> to {place.building}, Google Maps, opens in a new tab</span> ↗
+                    </a>
+                  </li>
+                </ul>
+              </div>
+              <iframe
+                class="map"
+                title={`Map: ${place.building}, ANU building ${place.number}`}
+                src={osmEmbedUrl(place)}
+                loading="lazy"
+                referrerpolicy="no-referrer"
+              />
+            </div>
+          ) : (
+            <p class="muted">No map location known for {location}.</p>
+          ),
+        )
+      )
+    }
+    <p class="muted map-credit">Map © OpenStreetMap contributors. Pin from ANU's campus map.</p>
+  </section>
 
   <div class="actions" style="margin-top:1.25rem">
     {

@@ -37,7 +37,9 @@ table that scrolls sideways.
 Today, in the next-class card or on Choose times. A details page opens with
 MyTimetable's own fields: type, group, activity, description, day, time,
 campus, location, staff, duration, dates and seats. It also lists every
-class date, with the next one marked. An activity in two parts, such as
+class date, with the next one marked, and shows the building on an
+OpenStreetMap map. The pin comes from ANU's own campus map, with links to
+ANU's page for that room or building and to walking directions. An activity in two parts, such as
 COMP3900 TutA/07 (a tutorial, then a drop-in), shows both parts.
 
 **True where it claims to be.** The eight allocated activities are the

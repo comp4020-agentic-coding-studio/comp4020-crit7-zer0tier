@@ -540,3 +540,15 @@ details.dates summary { cursor: pointer; font-weight: 600; min-height: 2.75rem; 
 .summary-list li { font-size: 0.925rem; }
 .head-actions { align-items: center; }
 .course-card header .summary-link { flex-basis: 100%; }
+
+/* where: the class's building on a map */
+.where { margin-top: 1.25rem; border-top: 4px solid var(--gold); }
+.place { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); }
+.place + .place { margin-top: 1.25rem; padding-top: 1.25rem; border-top: 1px solid var(--line); }
+@media (min-width: 48rem) { .place { grid-template-columns: minmax(0, 18rem) minmax(0, 1fr); align-items: start; } }
+.place-text p { margin: 0.2rem 0; }
+.place-text .muted { font-size: 0.875rem; overflow-wrap: anywhere; }
+.place-links { list-style: none; margin: 0.5rem 0 0; padding: 0; display: grid; gap: 0.25rem; }
+.map { display: block; width: 100%; max-width: 100%; height: 20rem; border: 1px solid var(--line); background: var(--grid); }
+@media (min-width: 48rem) { .map { height: 24rem; } }
+.map-credit { font-size: 0.8rem; margin: 0.75rem 0 0; }
