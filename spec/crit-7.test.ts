@@ -145,6 +145,38 @@ describe("core flow: choosing a tutorial time persists", () => {
   });
 });
 
+describe("course summaries: one click to Programs and Courses", () => {
+  // the four URLs the student gave, as literals
+  const SUMMARY = {
+    PHIL1005: "https://programsandcourses.anu.edu.au/course/PHIL1005",
+    COMP4020: "https://programsandcourses.anu.edu.au/course/COMP4020",
+    COMP3900: "https://programsandcourses.anu.edu.au/course/COMP3900",
+    COMP3500: "https://programsandcourses.anu.edu.au/course/COMP3500",
+  };
+  const link = (url: string) => new RegExp(`href="${url}"[^>]*target="_blank"[^>]*rel="noopener"`);
+
+  it("lists all four in the quick-access panel", async () => {
+    const home = await page("/");
+    for (const url of Object.values(SUMMARY)) expect(home).toMatch(link(url));
+  });
+
+  it("links each details page and course page to its own course's summary", async () => {
+    const details = { PHIL1005: "PHIL1005-LecA-01", COMP4020: "COMP4020-LecA-01", COMP3900: "COMP3900-TutA-07", COMP3500: "COMP3500-LecA-01" };
+    for (const [code, url] of Object.entries(SUMMARY)) {
+      const d = await page(`/activities/${details[code as keyof typeof details]}/`);
+      expect(d).toMatch(link(url));
+      for (const other of Object.values(SUMMARY)) if (other !== url) expect(d).not.toContain(`href="${other}"`);
+      expect(await page(`/courses/${code}/`)).toMatch(link(url));
+    }
+    const overview = await page("/allocate/");
+    for (const url of Object.values(SUMMARY)) expect(overview).toMatch(link(url));
+  });
+
+  it("says it opens a new tab, in the link text", async () => {
+    expect(await page("/activities/PHIL1005-LecA-01/")).toContain("opens in a new tab");
+  });
+});
+
 describe("quick access: the saved home view persists", () => {
   it("opens to the week by default, and to Today once saved", async () => {
     expect(await page("/")).toContain('data-view="week"');

@@ -1,0 +1,25 @@
+---
+// A link out to the course's Programs and Courses summary. It opens in a
+// new tab, so the timetable stays where it was. Screen readers always hear
+// "opens in a new tab" in the link text; sighted readers see an arrow, and
+// the plain-link variant spells it out too.
+import { courseSummaryUrl } from "../lib/links";
+
+interface Props {
+  code: string;
+  title?: string; // shown after the code in the list variant
+  variant?: "button" | "link" | "list";
+}
+const { code, title, variant = "link" } = Astro.props;
+---
+
+<a
+  class:list={[variant === "button" ? "button secondary" : "link-target", "summary-link", `summary-as-${variant}`]}
+  href={courseSummaryUrl(code)}
+  target="_blank"
+  rel="noopener"
+  data-summary={code}
+>
+  {variant === "list" ? <><strong>{code}</strong> {title}</> : <>{code} course summary</>}
+  <span class="ext"> (Programs and Courses, opens in a new tab)</span>
+</a>

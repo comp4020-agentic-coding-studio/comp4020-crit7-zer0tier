@@ -414,3 +414,12 @@ O’Donoghue Cultural Centre Bldg 153") and a 30-minute drop-in clipped
 every box that had fitted. Put the full value on the details page, and give
 the grid a short form. Re-run `pnpm audit:browser` whenever the data
 changes, not only when the CSS does.
+
+### A class name built from a prop can collide with a container's
+
+`summary-${variant}` produced `summary-list` on a link that sat inside
+`<ul class="summary-list">`, so the link inherited the list's
+`display: grid` and broke into one line per child. No check caught it:
+nothing overflowed or clipped. Only the screenshot showed it. Prefix
+generated modifier classes (`summary-as-list`), and look at every new
+component rendered, not just its audit result.

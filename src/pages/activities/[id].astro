@@ -2,6 +2,7 @@
 // One activity's full record, laid out with MyTimetable's own field names
 // so it reads like the source it was copied from. Multi-part activities
 // (TutA/07 = tutorial P1 + drop-in P2) show every part.
+import CourseSummaryLink from "../../components/CourseSummaryLink.astro";
 import Layout from "../../components/Layout.astro";
 import { findActivity } from "../../lib/db";
 import {
@@ -44,8 +45,9 @@ const long = (d: string) =>
       <h1>{title}</h1>
       <p class="muted">{course.title} (Class: {course.classNumber})</p>
     </div>
-    <div class="actions">
+    <div class="actions head-actions">
       <span class={`pill ${status}`}>{statusText}</span>
+      <CourseSummaryLink code={course.code} variant="button" />
     </div>
   </div>
 

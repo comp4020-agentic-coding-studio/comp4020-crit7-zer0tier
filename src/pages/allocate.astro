@@ -1,4 +1,5 @@
 ---
+import CourseSummaryLink from "../components/CourseSummaryLink.astro";
 import Layout from "../components/Layout.astro";
 import { listCourses, listGroups } from "../lib/db";
 import { SEMESTER, fmtSlots } from "../lib/timetable";
@@ -24,6 +25,7 @@ const statusText = { allocated: "Allocated", pending: "Wait list", unallocated: 
               <span class="code">{c.code}</span> {c.title}
             </h2>
             <span class="muted">Class {c.classNumber}</span>
+            <CourseSummaryLink code={c.code} />
           </header>
           <ul class="groups">
             {groups

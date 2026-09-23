@@ -21,6 +21,10 @@ timetable, so the app offers three routes, all on the home page:
 - a **calendar feed** (`/calendar.ics`) of every allocated class, weekly
   through the semester, skipping the 7–18 September teaching break
 
+A fourth shortcut goes to each course's official summary on ANU Programs
+and Courses. It's linked from the Quick access panel, every class's details
+page, each course's page and the course overview, and it opens in a new tab.
+
 **Optimised, measured.** From the home page, choosing a tutorial is two
 clicks and a save. Clashes are named in words rather than implied by
 position, and a full class offers the wait list without costing you your

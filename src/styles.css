@@ -530,3 +530,13 @@ details.dates summary { cursor: pointer; font-weight: 600; min-height: 2.75rem; 
 }
 .legend .sample-key::before { border-left-color: var(--unigrey); }
 @media (min-width: 60rem) { .event.clash { padding-block: 0.1rem; } }
+
+/* course summary links (out to Programs and Courses) */
+.summary-link .ext { font-weight: 400; }
+.summary-link .ext { color: var(--unigrey); font-size: 0.85rem; }
+.summary-as-button .ext, .summary-as-list .ext { position: absolute !important; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.summary-as-button::after, .summary-as-list::after { content: " ↗"; }
+.summary-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35rem; }
+.summary-list li { font-size: 0.925rem; }
+.head-actions { align-items: center; }
+.course-card header .summary-link { flex-basis: 100%; }

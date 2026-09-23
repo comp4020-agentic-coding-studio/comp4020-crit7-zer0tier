@@ -1,6 +1,7 @@
 ---
+import CourseSummaryLink from "../components/CourseSummaryLink.astro";
 import Layout from "../components/Layout.astro";
-import { type HomeView, getHomeView, listGroups } from "../lib/db";
+import { type HomeView, getHomeView, listCourses, listGroups } from "../lib/db";
 import {
   DAY_NAMES,
   DAYS,
@@ -334,7 +335,7 @@ const label = (e: { view: { course: { code: string }; group: { label: string } }
     <aside class="stack" aria-label="Quick access">
       <section class="card quick" aria-labelledby="quick-h">
         <h2 id="quick-h">Quick access</h2>
-        <p class="muted">Three ways to get here without hunting through menus.</p>
+        <p class="muted">Get here, and to your courses, without hunting through menus.</p>
 
         <section>
           <h3>Open straight to your view</h3>
@@ -350,6 +351,18 @@ const label = (e: { view: { course: { code: string }; group: { label: string } }
             </fieldset>
             <button class="button secondary">Save</button>
           </form>
+        </section>
+
+        <section>
+          <h3>Course summaries</h3>
+          <p>Each course's official page on ANU Programs and Courses, with its learning outcomes and indicative assessment. Opens in a new tab.</p>
+          <ul class="summary-list">
+            {listCourses().map((c) => (
+              <li>
+                <CourseSummaryLink code={c.code} title={c.title} variant="list" />
+              </li>
+            ))}
+          </ul>
         </section>
 
         <section>
