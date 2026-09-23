@@ -1,54 +1,36 @@
 # Process overview
 
-<!-- TEMPLATE: this file is a shape to fill in, not a form. Replace everything
-     in it with your own overview, and delete this comment — `pnpm
-     check:evidence` will remind you if it's still here. -->
-
-Written by you, for a reader: how you got from the brief to the harness and
-agentic workflow behind this submission. Markers read this file and follow its
-citations; they don't trawl the repo for evidence you didn't point at.
-
-This file is the shape; the course site's
-[assessment page](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/topics/assessment/#what-you-submit)
-is the requirement, and its
-[word counts](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/topics/assessment/#word-counts)
-cover every deliverable.
-
 ## What I built
 
-A sentence or two. `README.md` is where the account of what the app is and what
-good means here lives; this file is how you got there.
+A rebuilt slice of ANU MyTimetable. The home page is the timetable itself,
+tutorial times are chosen with seats and clashes in view, and three
+quick-access routes get you back to it. `README.md` has the argument.
 
 ## How I got here
 
-The account of the process: how the work actually went, and how you knew the
-result was right. Tell it in whatever order makes it clear. A weekly prototype
-needs a paragraph or two; an assignment needs more.
+I directed it with a screenshot of my real MyTT home page and one line:
 
-Cite the record as you go, as links whose text is the commit hash or range and
-whose target is this repo's commit or compare URL, so a reader clicks straight
-to the evidence:
+> the current timetabling is not user-friendly. Make the current UI more
+> optimised and give it an option to make the user have the quick access to
+> it (finding it currently is quite hard)
 
-- one commit: [`a1b2c3d`](https://github.com/YOUR-ORG/YOUR-REPO/commit/a1b2c3d)
-- a range:
-  [`a1b2c3d...e4f5a6b`](https://github.com/YOUR-ORG/YOUR-REPO/compare/a1b2c3d...e4f5a6b)
+**Grounding, then a correction to the contract.** The spec test I'd committed
+earlier, [`47f0bc4`](https://github.com/comp4020-agentic-coding-studio/comp4020-crit7-zer0tier/commit/47f0bc4), guessed a room-booking app. The
+agent rewrote it for the timetable flow rather than building to the wrong
+contract. It checked the course titles, class numbers and semester dates
+against Programs and Courses. It labelled times and rooms as illustrative,
+because the real ones need a login. Each new test was made to fail first, by
+breaking the clash rule and then the database write
+([`8c963e3`](https://github.com/comp4020-agentic-coding-studio/comp4020-crit7-zer0tier/commit/8c963e3)).
 
-To pair a prompt with the commit it produced, quote the prompt (curated, not a
-full transcript) next to the citation:
+**The browser found what the spec couldn't.** With every test green, driving
+the flow in Chromium showed a clashing tutorial stacked on top of the class it
+clashed with. The fix gave clashes side-by-side lanes and a sentence naming
+them. A new clipped-content check then went red at 1920, where rows were 3px
+too short. That audit is now a committed sensor
+([`6a1e332`](https://github.com/comp4020-agentic-coding-studio/comp4020-crit7-zer0tier/commit/6a1e332)), verified red before it was trusted.
 
-> the prompt, verbatim
-
-Screenshots are welcome where one carries the point better than a sentence does.
-Commit the file to this repo and link it with a **relative** path, which is what
-makes it render on GitHub: `![alt text](docs/before.png)`. Images don't count
-towards the word count and don't replace the citation.
-
-## Before you ship
-
-`pnpm check:evidence` verifies that this comment is gone, that your citations
-resolve to real commits, that a crit week's reflection entry is in
-`reflections/`, and that your `CLAUDE.md` is there. It checks that your account
-is traceable, not that it is good: that is the marker's call.
-
-Images aren't checked: unlike a citation whose SHA doesn't resolve, a broken
-image is visible the moment this file is rendered on GitHub.
+| check | result |
+| --- | --- |
+| `pnpm check` | 70 tests green |
+| `pnpm audit:browser` | 54 renders, 9 widths, 0 failures |

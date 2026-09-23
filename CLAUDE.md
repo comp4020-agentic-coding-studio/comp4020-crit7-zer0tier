@@ -333,3 +333,40 @@ inspected. Fail immediately if the expected built app is missing. Measure a
 skip link after focusing it: its intentional 1px hidden box says nothing about
 the keyboard target. Keep browser reports even if a later interaction fails,
 so a search selector error cannot hide the page measurements already collected.
+
+### `overflow: hidden` clips silently; audit for it
+
+A fixed-height box with `overflow: hidden` drops its last line without
+anyone noticing. In C7 every one-hour class lost its room name at 769px,
+and even 1920 clipped by 3px. `scrollHeight > clientHeight` (and the same
+for width) on every such box is the check. `pnpm audit:browser` asserts it.
+
+### Grid items that share a cell stack, and one hides the other
+
+Two CSS grid items with overlapping `grid-row` in the same column paint on
+top of each other with no warning. On a timetable that hides the exact thing
+the student needs to see, a clash. Give overlapping items their own lanes,
+and say the overlap in words as well. Only driving the flow in a browser
+found this. Every HTTP test was green.
+
+### A pre-existing spec guess is not the contract
+
+The crit-7 test committed before building guessed "room booking". The
+student then asked for timetabling. Rewrite a guessed test to the actual
+request, say so in the commit, and don't build to the guess.
+
+### `pkill -f <pattern>` can kill your own shell
+
+If the pattern appears in the command line that runs it, `pkill -f` matches
+the running shell too (exit 144, and the rest of the command silently never
+runs, including a build). Keep a PID file (`/tmp/restart.sh` style) and
+kill by PID.
+
+### The browser audit is a committed script
+
+`pnpm build && pnpm audit:browser` boots the built server on a throwaway
+database, drives the core flow, then checks nine widths. It's not in
+`check`, because CI has no Chromium. Run it before every push that touches
+UI. It needs `pnpm exec playwright install chromium-headless-shell`. On this
+WSL machine it also needs `libasound2` extracted with
+`apt download libasound2t64 && dpkg -x` and put on `LD_LIBRARY_PATH`.
