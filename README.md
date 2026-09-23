@@ -29,18 +29,35 @@ table that scrolls sideways.
 
 ![The same page at 390px: the week becomes a per-day list](public/after-phone.png)
 
-**True where it claims to be.** These details are real: the course codes,
-titles and class numbers, the semester dates (27 July to 30 October 2026, from
-ANU Programs and Courses), and the teaching break (from ANU's CBE Student
-Engagement Planner 2026). Class **times, rooms and seat counts are
-illustrative**, because MyTT's real ones sit behind a login. Every page
-showing them says so. COMP3500 appears in MyTT as "Computing Team Project",
-but Programs and Courses 2026 calls it "Software Engineering Project". The
-app uses the Programs and Courses title.
+**Every class opens its full record.** Click any class on the timetable, in
+Today, in the next-class card or on Choose times. A details page opens with
+MyTimetable's own fields: type, group, activity, description, day, time,
+campus, location, staff, duration, dates and seats. It also lists every
+class date, with the next one marked. An activity in two parts, such as
+COMP3900 TutA/07 (a tutorial, then a drop-in), shows both parts.
+
+**True where it claims to be.** The eight allocated activities are the
+student's real MyTimetable records, copied field for field on 23 September
+2026. One correction: the export printed "O?Donoghue", a lost apostrophe.
+ANU's map names the building Lowitja O’Donoghue Cultural Centre. Each
+record's own date list drives the week view and the calendar feed. So a
+Monday class disappears on 5 October, when MyTimetable doesn't list it.
+Course codes, titles, class numbers and semester dates are checked against
+ANU Programs and Courses. Two things are **sample data**, hatched on the
+grid and labelled on their pages:
+
+- COMP3500's lecture, whose details weren't provided
+- the alternative tutorial times under "Choose times", which MyTimetable
+  only shows behind its login
+
+COMP3500 appears in MyTT as "Computing Team Project", but Programs and
+Courses 2026 calls it "Software Engineering Project". The app uses the
+Programs and Courses title.
 
 | What | How it's held |
 | --- | --- |
 | Choosing a time survives a reload; wait list keeps your seat; read-only groups refuse | `spec/crit-7.test.ts`, over HTTP against the built server |
+| Each real record's details page carries every MyTT field | `spec/crit-7.test.ts`, against a table transcribed separately from the seed |
 | Clash rule is half-open (9–10 and 10–11 don't clash); week numbers; next class; `.ics` output | literal fixtures in `spec/crit-7.test.ts` |
 | No sideways scroll, nothing clipped, 24px targets, 12px text, axe incl. contrast | `pnpm audit:browser`, in Chromium at nine widths |
 | Whether it's actually easier than MyTT | judgement: the crit |

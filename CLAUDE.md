@@ -397,3 +397,20 @@ Astro routes markdown images through `/_image`. Its default service needs
 `passthroughImageService()`. `pnpm audit:browser` scrolls each image into
 view, because lazy images don't load offscreen and would read as broken.
 Then it fails on `naturalWidth === 0`.
+
+### Real records get a test table typed separately from the seed
+
+When the student pastes real data (C7: eight MyTimetable records), write
+the expected values into the test from the paste itself, not by importing
+the seed. A test that reads the seed agrees with any typo in it. Verified
+by changing one staff name by one letter: exactly that record went red.
+Fix obvious export damage (`O?Donoghue` is a lost apostrophe) against the
+real source, and say so in the seed and the README.
+
+### Real data breaks layouts that sample data fitted
+
+Sample rooms were short. The real ones ("Manning Clark Hall Rm 1.04_Lowitja
+O’Donoghue Cultural Centre Bldg 153") and a 30-minute drop-in clipped
+every box that had fitted. Put the full value on the details page, and give
+the grid a short form. Re-run `pnpm audit:browser` whenever the data
+changes, not only when the CSS does.
