@@ -17,6 +17,7 @@ import {
   sessions,
   waitlist,
 } from "./schema";
+import { NO_PREFS, type PlanGroup, type Prefs } from "./planner";
 import { seedRows } from "./seed";
 import { clashesOnADate } from "./timetable";
 
@@ -210,4 +211,76 @@ export function setHomeView(view: HomeView): void {
     .values({ key: "homeView", value: view })
     .onConflictDoUpdate({ target: preferences.key, set: { value: view } })
     .run();
+}
+
+// --- planner ---------------------------------------------------------------
+
+
+/** The student's groups in the planner's terms. */
+export function plannerGroups(): PlanGroup[] {
+  return listGroups().map((g) => ({
+    groupId: g.group.id,
+    readOnly: g.group.readOnly,
+    options: g.options.map((a) => ({
+      id: a.id,
+      label: `${g.course.code} ${g.group.label}/${a.number}`,
+      sessions: a.sessions,
+      seats: a.seats,
+      held: g.chosen?.id === a.id,
+      sample: a.source === "illustrative",
+    })),
+  }));
+}
+
+export function getPlannerPrefs(): Prefs {
+  const row = db.select().from(preferences).where(eq(preferences.key, "plannerPrefs")).get();
+  if (!row) return NO_PREFS;
+  try {
+    const p = JSON.parse(row.value);
+    const num = (v: unknown, lo: number, hi: number) =>
+      typeof v === "number" && Number.isInteger(v) && v >= lo && v <= hi ? v : null;
+    return { notBefore: num(p.notBefore, 0, 1440), notAfter: num(p.notAfter, 0, 1440), freeDay: num(p.freeDay, 1, 5) };
+  } catch {
+    return NO_PREFS;
+  }
+}
+
+export function setPlannerPrefs(p: Prefs): void {
+  const value = JSON.stringify(p);
+  db.insert(preferences)
+    .values({ key: "plannerPrefs", value })
+    .onConflictDoUpdate({ target: preferences.key, set: { value } })
+    .run();
+}
+
+/** Apply a plan (one activity per group, every group): all of it, or none. */
+export function applyPlan(activityIds: string[]): { ok: true; changed: number } | { ok: false; reason: string } {
+  const acts = activityIds.map((id) => db.select().from(activities).where(eq(activities.id, id)).get());
+  if (acts.some((a) => !a)) return { ok: false, reason: "That plan names an activity that doesn't exist." };
+  const groupIds = acts.map((a) => (a as Activity).groupId);
+  const allGroups = db.select().from(activityGroups).all().map((g) => g.id);
+  // a plan is a whole week: exactly one activity for every group, no more, no fewer
+  if (new Set(groupIds).size !== groupIds.length || groupIds.length !== allGroups.length) {
+    return { ok: false, reason: "A plan has exactly one activity for every group." };
+  }
+  let changed = 0;
+  try {
+    db.transaction(() => {
+      for (const a of acts as Activity[]) {
+        const group = db.select().from(activityGroups).where(eq(activityGroups.id, a.groupId)).get();
+        const held = db.select().from(allocations).where(eq(allocations.groupId, a.groupId)).get();
+        if (group?.readOnly) {
+          if (held?.activityId !== a.id) throw new Error(`${group.label} is read only.`);
+          continue;
+        }
+        const r = allocate(a.groupId, a.id);
+        if (!r.ok) throw new Error(r.reason);
+        if (r.outcome === "waitlisted") throw new Error(`${a.id} is full.`);
+        if (r.outcome === "allocated") changed++;
+      }
+    });
+  } catch (e) {
+    return { ok: false, reason: (e as Error).message };
+  }
+  return { ok: true, changed };
 }

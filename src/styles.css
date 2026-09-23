@@ -552,3 +552,20 @@ details.dates summary { cursor: pointer; font-weight: 600; min-height: 2.75rem; 
 .map { display: block; width: 100%; max-width: 100%; height: 20rem; border: 1px solid var(--line); background: var(--grid); }
 @media (min-width: 48rem) { .map { height: 24rem; } }
 .map-credit { font-size: 0.8rem; margin: 0.75rem 0 0; }
+
+/* planner */
+.plan-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
+.plan-head h2 { margin: 0 0 0.75rem; }
+.plan-days { list-style: none; margin: 0 0 0.75rem; padding: 0; display: grid; gap: 0.3rem; }
+.plan-days li { display: grid; grid-template-columns: 2.5rem minmax(0, 1fr) 3rem; align-items: center; gap: 0.5rem; }
+.plan-days .d { font-weight: 700; }
+.plan-days .bar { height: 0.9rem; background: linear-gradient(to right, var(--black) var(--w), var(--tint) var(--w)); }
+.plan-days li.free .d::after { content: " ·"; color: var(--gold); }
+.plan-days .h { font-size: 0.875rem; text-align: right; }
+.plan-why { margin: 0 0 0.75rem; padding-left: 1.2rem; font-size: 0.925rem; }
+.plan-choice { list-style: none; margin: 0 0 1rem; padding: 0; display: grid; gap: 0.25rem; }
+.prefs { display: grid; gap: 0.35rem; margin-bottom: 0.75rem; }
+.prefs select { min-height: 2.75rem; font: inherit; padding: 0 0.5rem; border: 1px solid var(--unigrey); background: var(--white); color: var(--black); margin-bottom: 0.5rem; }
+.plan + .plan { margin-top: 0; }
+/* on one column, preferences come before the plans they shape */
+@media (max-width: 79.99rem) { .planner-layout > aside { order: -1; } }

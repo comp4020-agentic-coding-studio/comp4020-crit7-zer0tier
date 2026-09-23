@@ -1,0 +1,135 @@
+---
+import Layout from "../components/Layout.astro";
+import { getPlannerPrefs, listGroups, plannerGroups } from "../lib/db";
+import { WEIGHTS, explain, plan } from "../lib/planner";
+import { DAYS, DAY_NAMES, fmtSlots, fmtTime } from "../lib/timetable";
+
+const prefs = getPlannerPrefs();
+const groups = plannerGroups();
+const plans = plan(groups, prefs, 3);
+const views = new Map(listGroups().map((g) => [g.group.id, g]));
+const error = Astro.url.searchParams.get("error") === "1";
+const saved = Astro.url.searchParams.get("saved") === "1";
+const hrs = (m: number) => `${Math.round((m / 60) * 10) / 10} h`;
+const TIMES = [8, 9, 10, 11].map((h) => h * 60);
+const ENDS = [15, 16, 17, 18].map((h) => h * 60);
+---
+
+<Layout title="Planner · Timetable, sorted" current="planner">
+  {saved && <p class="flash" role="status">Saved. Plans below use your new preferences.</p>}
+  {error && <p class="flash warn" role="alert">That plan couldn't be applied. Your times haven't changed.</p>}
+  <div class="page-head">
+    <div>
+      <h1>Planner</h1>
+      <p class="muted">The fairest week your choosable times allow: no clashes, no full classes, evenly spread, few gaps.</p>
+    </div>
+  </div>
+
+  <div class="layout planner-layout">
+    <div class="stack">
+      {
+        plans.length === 0 ? (
+          <section class="card">
+            <h2>No plan fits</h2>
+            <p>Every combination clashes or needs a full class. Try loosening a preference.</p>
+          </section>
+        ) : (
+          plans.map((p, i) => (
+            <section class="card plan" aria-labelledby={`plan-${i}`} data-plan={i} data-score={p.score}>
+              <header class="plan-head">
+                <h2 id={`plan-${i}`}>
+                  {i === 0 ? "Fairest plan" : `Option ${i + 1}`}
+                  <span class="muted"> · score {p.score}</span>
+                </h2>
+                {p.changes === 0 && <span class="pill allocated">Your current times</span>}
+              </header>
+              {p.usesSample && (
+                <p class="flash warn">
+                  Uses <strong>sample</strong> tutorial times, which are illustrative, not from MyTimetable.
+                </p>
+              )}
+              <ul class="plan-days" aria-label="Class time per day">
+                {p.dayMinutes.map((m, d) => (
+                  <li class:list={{ free: prefs.freeDay === d + 1 }}>
+                    <span class="d">
+                      {DAYS[d]}
+                      <span class="visually-hidden"> ({DAY_NAMES[d]})</span>
+                    </span>
+                    <span class="bar" style={`--w:${Math.min(100, (m / 360) * 100)}%`} aria-hidden="true" />
+                    <span class="h">{m ? hrs(m) : "free"}</span>
+                  </li>
+                ))}
+              </ul>
+              <ul class="plan-why">
+                {explain(p, prefs).map((line) => (
+                  <li>{line}</li>
+                ))}
+              </ul>
+              <ul class="plan-choice">
+                {p.choice
+                  .filter((o) => !views.get(o.id.split("-").slice(0, 2).join("-"))?.group.readOnly)
+                  .map((o) => (
+                    <li data-activity={o.id}>
+                      <a class="link-target" href={`/activities/${o.id}/`}>
+                        {o.label}
+                      </a>{" "}
+                      · {fmtSlots(o.sessions)}
+                      {o.held ? <span class="muted"> · current</span> : <strong> · change</strong>}
+                      {o.sample && <span class="sample-tag">Sample</span>}
+                    </li>
+                  ))}
+              </ul>
+              {p.changes > 0 ? (
+                <form method="post" action="/api/plan">
+                  {p.choice.map((o) => (
+                    <input type="hidden" name="activity" value={o.id} />
+                  ))}
+                  <button class="button">Use this plan ({p.changes} change{p.changes > 1 ? "s" : ""})</button>
+                </form>
+              ) : (
+                <p class="muted">This is what you have now.</p>
+              )}
+            </section>
+          ))
+        )
+      }
+    </div>
+
+    <aside class="stack" aria-label="Planner preferences">
+      <section class="card quick" aria-labelledby="prefs-h">
+        <h2 id="prefs-h">Your preferences</h2>
+        <form method="post" action="/api/planner-prefs" class="prefs">
+          <label for="notBefore">No classes starting before</label>
+          <select id="notBefore" name="notBefore">
+            <option value="" selected={prefs.notBefore === null}>Any time</option>
+            {TIMES.map((t) => <option value={t} selected={prefs.notBefore === t}>{fmtTime(t)}</option>)}
+          </select>
+          <label for="notAfter">No classes ending after</label>
+          <select id="notAfter" name="notAfter">
+            <option value="" selected={prefs.notAfter === null}>Any time</option>
+            {ENDS.map((t) => <option value={t} selected={prefs.notAfter === t}>{fmtTime(t)}</option>)}
+          </select>
+          <label for="freeDay">Keep a day free</label>
+          <select id="freeDay" name="freeDay">
+            <option value="" selected={prefs.freeDay === null}>No preference</option>
+            {DAY_NAMES.map((d, i) => <option value={i + 1} selected={prefs.freeDay === i + 1}>{d}</option>)}
+          </select>
+          <button class="button secondary">Save and re-plan</button>
+        </form>
+        <p class="muted">Lectures are read only, so they never move; the planner chooses tutorial times around them.</p>
+      </section>
+
+      <details class="card notices">
+        <summary>How plans are ranked</summary>
+        <p>Every combination of tutorial times is tried. Any with a clash, or a full class you don't already hold, is dropped. The rest are scored, lowest first:</p>
+        <ul>
+          <li>{WEIGHTS.spreadPerHour} points per hour the days vary by (standard deviation)</li>
+          <li>{WEIGHTS.gapPerHour} point per hour of gaps between classes</li>
+          <li>{WEIGHTS.early} points per class starting too early, {WEIGHTS.late} per class ending too late</li>
+          <li>{WEIGHTS.freeDay} points per class on your free day</li>
+          <li>{WEIGHTS.change} points per change, so equal plans keep your current times</li>
+        </ul>
+      </details>
+    </aside>
+  </div>
+</Layout>

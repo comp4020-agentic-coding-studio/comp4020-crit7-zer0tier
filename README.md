@@ -42,6 +42,20 @@ OpenStreetMap map. The pin comes from ANU's own campus map, with links to
 ANU's page for that room or building and to walking directions. An activity in two parts, such as
 COMP3900 TutA/07 (a tutorial, then a drop-in), shows both parts.
 
+**A planner that proposes a fair week.** The Planner page tries every
+combination of tutorial times and drops any with a clash, or a full class
+you don't already hold. It ranks the rest by rules shown on the page:
+- an even spread of class time across the week
+- few gaps between classes
+- your own preferences: no classes before or after a time, a day kept free
+- fewer changes, to break ties
+
+Lectures are read only, so they never move. Each plan shows hours per day,
+why it scored as it did, and which times it changes. "Use this plan" applies
+the whole plan or none of it. "Fair" means fair to your week. The planner
+can't know other students' needs, and alternative tutorial times are sample
+data, so plans that use them say so.
+
 **True where it claims to be.** The eight allocated activities are the
 student's real MyTimetable records, copied field for field on 23 September
 2026. One correction: the export printed "O?Donoghue", a lost apostrophe.
@@ -66,6 +80,7 @@ Programs and Courses title.
 | Each real record's details page carries every MyTT field | `spec/crit-7.test.ts`, against a table transcribed separately from the seed |
 | Clash rule is half-open (9–10 and 10–11 don't clash); week numbers; next class; `.ics` output | literal fixtures in `spec/crit-7.test.ts` |
 | No sideways scroll, nothing clipped, 24px targets, 12px text, axe incl. contrast | `pnpm audit:browser`, in Chromium at nine widths |
+| Planner ranks by spread, gaps and preferences; never a clash or full class; applies all or nothing | fixtures with hand-worked scores, and HTTP tests, in `spec/crit-7.test.ts` |
 | Whether it's actually easier than MyTT | judgement: the crit |
 
 **ANU's own web style.** Colours and type follow the

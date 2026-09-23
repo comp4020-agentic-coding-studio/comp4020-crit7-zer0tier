@@ -423,3 +423,19 @@ changes, not only when the CSS does.
 nothing overflowed or clipped. Only the screenshot showed it. Prefix
 generated modifier classes (`summary-as-list`), and look at every new
 component rendered, not just its audit result.
+
+### A rollback test must fail *after* something was written
+
+The planner's all-or-nothing test stayed green with its transaction
+removed. The impossible change came first in the plan, so it failed before
+anything was written, and there was nothing to roll back. Put the failing
+step last, assert that order in the test, and delete the transaction once
+to watch it go red. The same test caught a real gap on its first run: an
+empty plan was accepted as "0 changes".
+
+### When the student's word is ambiguous, define it on the page
+
+"A fair schedule" could mean several things. The planner states what it
+means, with its weights on the page, and the fixtures pin those rules
+down with hand-worked scores. A definition the reader can check beats one
+only the code knows.

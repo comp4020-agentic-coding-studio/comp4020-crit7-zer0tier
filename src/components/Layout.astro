@@ -4,12 +4,13 @@ import "../styles.css";
 
 interface Props {
   title: string;
-  current?: "timetable" | "allocate" | "about";
+  current?: "timetable" | "allocate" | "planner" | "about";
 }
 const { title, current } = Astro.props;
 const links = [
   { href: "/", label: "My timetable", key: "timetable" },
   { href: "/allocate/", label: "Choose times", key: "allocate" },
+  { href: "/planner/", label: "Planner", key: "planner" },
   { href: "/readme/", label: "About", key: "about" },
 ] as const;
 ---

@@ -10,6 +10,7 @@ import {
   teachingWeek,
   toICS,
 } from "../src/lib/timetable";
+import { type PlanGroup, plan, scorePlan } from "../src/lib/planner";
 
 // This week's own contract (crit 07, "Build the ANU system you wish
 // existed"): a rebuilt MyTimetable. The published spec's one mechanically
@@ -227,6 +228,72 @@ describe("quick access: the saved home view persists", () => {
   });
 });
 
+describe("planner: generates a fair schedule, and applying it persists", () => {
+  const firstPlanIds = (html: string) => {
+    const form = html.match(/<section[^>]*data-plan="0"[\s\S]*?<\/section>/)?.[0] ?? "";
+    return [...form.matchAll(/name="activity" value="([^"]+)"/g)].map((m) => m[1]);
+  };
+
+  it("offers plans that name every group once", async () => {
+    const html = await page("/planner/");
+    expect(html).toContain('data-plan="0"');
+    expect(html).toContain("How plans are ranked");
+  });
+
+  it("saves preferences so a reload still has them", async () => {
+    expect((await post("/api/planner-prefs", { notBefore: "540", notAfter: "", freeDay: "5" })).status).toBe(303);
+    const html = await page("/planner/");
+    expect(html).toMatch(/<option value="540" selected/);
+    expect(html).toMatch(/<option value="5" selected/);
+  });
+
+  it("applies a plan in one go, and a reload shows every choice", async () => {
+    await post("/api/planner-prefs", { notBefore: "", notAfter: "", freeDay: "5" }); // keep Friday free
+    const html = await page("/planner/");
+    const ids = firstPlanIds(html);
+    if (ids.length === 0) {
+      // the fairest plan is already what's held: nothing to apply, and the page says so
+      expect(html).toMatch(/data-plan="0"[\s\S]*?Your current times/);
+      return;
+    }
+    const res = await post("/api/plan", Object.fromEntries([]) as Record<string, string>);
+    expect(res.headers.get("location")).toContain("error=1"); // an empty plan is refused
+    const body = new URLSearchParams(ids.map((id) => ["activity", id]));
+    const applied = await fetch(new URL("/api/plan", baseUrl), { method: "POST", headers: { origin: baseUrl }, body, redirect: "manual" });
+    expect(applied.status).toBe(303);
+    expect(applied.headers.get("location")).toContain("planned=");
+    for (const id of ids) expect(await page(`/activities/${id}/`)).toContain("Your allocated time");
+  });
+
+  it("is all or nothing: a plan with one impossible change changes nothing", async () => {
+    const before = await page("/allocate/");
+    // the current allocation for every group, read off the overview
+    const held = Object.fromEntries(
+      [...before.matchAll(/data-group="([^"]+)" data-status="allocated">[\s\S]*?href="\/activities\/([^"/]+)\/"/g)].map((m) => [m[1], m[2]]),
+    );
+    expect(Object.keys(held)).toHaveLength(8); // COMP3500 LecA; COMP3900 LecA, TutA; COMP4020 LecA, TutA; PHIL1005 LecA, LecB, TutA
+    // one change that would work, one into a full class: must be refused whole
+    held["PHIL1005-TutA"] = held["PHIL1005-TutA"] === "PHIL1005-TutA-05" ? "PHIL1005-TutA-07" : "PHIL1005-TutA-05";
+    delete held["COMP4020-TutA"];
+    // the impossible change goes LAST, after the good one has been written,
+    // so only a real rollback leaves the page unchanged
+    const ids = [...Object.values(held), "COMP4020-TutA-03"];
+    expect(ids.indexOf("COMP4020-TutA-03")).toBeGreaterThan(ids.findIndex((id) => id.startsWith("PHIL1005-TutA")));
+    const body = new URLSearchParams(ids.map((id) => ["activity", id]));
+    const res = await fetch(new URL("/api/plan", baseUrl), { method: "POST", headers: { origin: baseUrl }, body, redirect: "manual" });
+    expect(res.headers.get("location")).toContain("error=1");
+    expect(await page("/allocate/")).toBe(before);
+  });
+
+  it("refuses an incomplete plan", async () => {
+    const before = await page("/allocate/");
+    const body = new URLSearchParams([["activity", "PHIL1005-TutA-05"]]);
+    const res = await fetch(new URL("/api/plan", baseUrl), { method: "POST", headers: { origin: baseUrl }, body, redirect: "manual" });
+    expect(res.headers.get("location")).toContain("error=1");
+    expect(await page("/allocate/")).toBe(before);
+  });
+});
+
 // Fixtures: literal expected answers, stated from outside the
 // implementation, for the conventions everything else rests on.
 describe("fixtures", () => {
@@ -290,6 +357,65 @@ describe("fixtures", () => {
     expect(nextClass(items, new Date("2026-09-04T08:00:00Z"))?.date).toBe("2026-09-21");
     // Sat 3 Oct: Mon 5 Oct isn't in the Monday dates, so next is Wed 7 Oct
     expect(nextClass(items, new Date("2026-10-03T00:00:00Z"))?.date).toBe("2026-10-07");
+  });
+
+  describe("planner scoring, worked by hand", () => {
+    const D = "27/7-30/10";
+    const fixed = (id: string, day: number, start: number, end: number) => ({
+      groupId: id, readOnly: true,
+      options: [{ id, label: id, sessions: [{ day, start, end, dates: D }], seats: 10, held: true, sample: false }],
+    });
+    const opt = (id: string, day: number, start: number, end: number, seats = 10, held = false) =>
+      ({ id, label: id, sessions: [{ day, start, end, dates: D }], seats, held, sample: false });
+    // lectures Mon 9-11 and Tue 9-11; one tutorial to choose
+    const groups = (options: ReturnType<typeof opt>[]): PlanGroup[] => [
+      fixed("LecA", 1, h(9), h(11)),
+      fixed("LecB", 2, h(9), h(11)),
+      { groupId: "Tut", readOnly: false, options },
+    ];
+    const T1 = opt("T1", 1, h(11), h(12)); // Mon, straight after the lecture
+    const T2 = opt("T2", 3, h(9), h(10)); // Wed
+    const T3 = opt("T3", 1, h(10), h(11)); // clashes with Mon's lecture
+    const T4 = opt("T4", 4, h(9), h(10), 0); // full
+
+    it("prefers the evener week: Wed beats Mon (spread 54 vs 76 min, scores 2.04 vs 2.78)", () => {
+      const [best, second] = plan(groups([T1, T2]));
+      expect(best.choice.map((o) => o.id)).toEqual(["LecA", "LecB", "T2"]);
+      expect([best.spreadMinutes, best.score]).toEqual([54, 2.04]);
+      expect([second.spreadMinutes, second.score]).toEqual([76, 2.78]);
+    });
+
+    it("never offers a clash or a full class", () => {
+      const ids = plan(groups([T1, T2, T3, T4]), undefined, 10).map((p) => p.choice[2].id);
+      expect(ids.sort()).toEqual(["T1", "T2"]);
+    });
+
+    it("keeps a full class the student already holds", () => {
+      const held = opt("T4", 4, h(9), h(10), 0, true);
+      expect(plan(groups([held]), undefined, 10).map((p) => p.choice[2].id)).toEqual(["T4"]);
+    });
+
+    it("lets preferences outrank spread: no classes before 10am picks Mon (8.78 vs 11.04)", () => {
+      const prefs = { notBefore: h(10), notAfter: null, freeDay: null };
+      const [best, second] = plan(groups([T1, T2]), prefs);
+      expect([best.choice[2].id, best.score, best.early]).toEqual(["T1", 8.78, 2]);
+      expect([second.choice[2].id, second.score, second.early]).toEqual(["T2", 11.04, 3]);
+    });
+
+    it("keeps a free day free: Wednesday off picks Mon (2.85 vs 6.25)", () => {
+      const [best, second] = plan(groups([T1, T2]), { notBefore: null, notAfter: null, freeDay: 3 });
+      expect([best.choice[2].id, best.score]).toEqual(["T1", 2.85]);
+      expect([second.choice[2].id, second.score, second.onFreeDay]).toEqual(["T2", 6.25, 1]);
+    });
+
+    it("counts gaps: Mon 9-10 then 12-1 is two hours of dead time", () => {
+      const p = scorePlan([opt("a", 1, h(9), h(10)), opt("b", 1, h(12), h(13))], { notBefore: null, notAfter: null, freeDay: null });
+      expect(p.gapMinutes).toBe(120);
+    });
+
+    it("returns no plan when every choice is impossible", () => {
+      expect(plan(groups([T3, T4]))).toEqual([]);
+    });
   });
 
   it("writes one weekly event per date range, in Canberra time", () => {

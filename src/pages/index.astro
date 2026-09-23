@@ -25,6 +25,7 @@ const view: HomeView = asked === "week" || asked === "today" ? asked : saved;
 const done = url.searchParams.get("done");
 const waited = url.searchParams.get("waitlisted");
 const savedView = url.searchParams.get("saved");
+const planned = url.searchParams.get("planned");
 
 const groups = listGroups();
 const counts = {
@@ -127,6 +128,11 @@ const label = (e: { view: { course: { code: string }; group: { label: string } }
       </p>
     )
   }
+  {planned !== null && (
+    <p class="flash" role="status">
+      Plan applied: {planned} tutorial time{planned === "1" ? "" : "s"} changed. <a href="/planner/">Back to the planner</a>
+    </p>
+  )}
   {savedView && <p class="flash" role="status">Saved. This page now opens to {saved === "today" ? "Today" : "This week"}.</p>}
 
   <div class="page-head">
