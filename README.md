@@ -52,8 +52,10 @@ and Gold tint `#F5EDDE` for panels. Text is black, with Unigrey `#333333` for
 muted lines. The typeface is Public Sans, self-hosted. The guide has no
 status or secondary colours, so courses are told apart by their codes and
 state is carried by words and weight. An event's left edge marks a lecture
-(black) or a tutorial (gold). The ANU crest and logo are deliberately left
-out: this is a student prototype, not an ANU service.
+(black) or a tutorial (gold). The header follows ANU's own sites: the
+official ANU logo (taken unmodified from `webstyle.anu.edu.au`) on a white
+masthead, above a black navigation bar. Beside the logo, the header says
+this is a student prototype and not an ANU service. The footer repeats it.
 
 **Not built:** sign-in and more than one student, swapping with another
 student, sessional (X1–X4) courses, and any connection to the real MyTT.

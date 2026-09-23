@@ -29,24 +29,33 @@ const links = [
   <body>
     <a class="skip" href="#main">Skip to content</a>
     <header class="site">
-      <div class="site-inner">
-        <a class="brand" href="/">
-          <span class="brand-mark" aria-hidden="true">TT</span>
-          <span>Timetable, sorted</span>
-        </a>
-        <nav aria-label="Main">
-          <ul>
-            {
-              links.map((l) => (
-                <li>
-                  <a href={l.href} aria-current={current === l.key ? "page" : undefined}>
-                    {l.label}
-                  </a>
-                </li>
-              ))
-            }
-          </ul>
-        </nav>
+      <div class="masthead">
+        <div class="site-inner">
+          <a class="logo" href="/">
+            <img src="/anu-logo.svg" alt="Australian National University" width="170" height="60" />
+          </a>
+          <div class="app-title">
+            <span class="app-name">Timetable, sorted</span>
+            <span class="app-note">Student prototype · not an ANU service</span>
+          </div>
+        </div>
+      </div>
+      <div class="navbar">
+        <div class="site-inner">
+          <nav aria-label="Main">
+            <ul>
+              {
+                links.map((l) => (
+                  <li>
+                    <a href={l.href} aria-current={current === l.key ? "page" : undefined}>
+                      {l.label}
+                    </a>
+                  </li>
+                ))
+              }
+            </ul>
+          </nav>
+        </div>
       </div>
     </header>
     <main id="main" tabindex="-1">

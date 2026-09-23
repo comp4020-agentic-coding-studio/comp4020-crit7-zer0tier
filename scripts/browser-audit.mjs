@@ -12,6 +12,7 @@
 //   - any axe-core violation, colour-contrast included
 //   - a skip link whose focused box is off-screen or tiny
 //   - Public Sans (ANU's web typeface) not actually loaded
+//   - any image (the ANU logo included) that fails to load
 // Usage: pnpm build && pnpm audit:browser   (WIDTHS=390,1920 to narrow it)
 // Needs a Chromium: `pnpm exec playwright install chromium-headless-shell`.
 // On WSL without libasound, put an extracted libasound2 on LD_LIBRARY_PATH.
@@ -118,6 +119,24 @@ try {
         const loaded = [...document.fonts].some((f) => f.family.includes("Public Sans") && f.status === "loaded");
         return { loaded, family: getComputedStyle(document.body).fontFamily };
       });
+      // lazy images only load near the viewport: scroll each in, then wait
+      const broken = await page.evaluate(async () => {
+        const out = [];
+        for (const img of document.images) {
+          img.scrollIntoView();
+          if (!img.complete) {
+            await new Promise((done) => {
+              img.addEventListener("load", done, { once: true });
+              img.addEventListener("error", done, { once: true });
+              setTimeout(done, 5000);
+            });
+          }
+          if (img.naturalWidth === 0) out.push(img.getAttribute("src"));
+        }
+        window.scrollTo(0, 0);
+        return out;
+      });
+      if (broken.length) fail(`${at} images not loading: ${broken.join(", ")}`);
       if (!font.loaded || !font.family.includes("Public Sans")) fail(`${at} Public Sans not rendering (${font.family})`);
       if (m.sw !== m.iw) fail(`${at} scrollWidth ${m.sw} != innerWidth ${m.iw}`);
       if (m.over.length) fail(`${at} crosses the right edge: ${m.over.slice(0, 4).join("; ")}`);

@@ -384,5 +384,16 @@ ANU's web palette is black, white, Gold `#BE830E`, Gold tint `#F5EDDE` and
 Unigrey `#333333` text. It has no status colours, and gold text on white
 is only allowed at 24px, or 19px semibold, and up (3.26:1). Carry state with
 words, weight and black/tint/white, and use gold for rules and borders. Take
-brand values from webpublishing.anu.edu.au, not memory. Never use the ANU
-crest on a student site.
+brand values from webpublishing.anu.edu.au, not memory. The logo is the
+official file from webstyle.anu.edu.au, unmodified. The student chose to
+use it after the brand-policy concern was raised once. It always sits
+beside a visible "student prototype, not an ANU service" line.
+
+### An image check has to scroll, and has to fail on a 500
+
+Astro routes markdown images through `/_image`. Its default service needs
+`sharp`, which wasn't installed, so every README screenshot 500'd on
+`/readme/` while every check stayed green. `astro.config.ts` now uses
+`passthroughImageService()`. `pnpm audit:browser` scrolls each image into
+view, because lazy images don't load offscreen and would read as broken.
+Then it fails on `naturalWidth === 0`.
