@@ -6,7 +6,6 @@ import { holidayOn, upcoming } from "../lib/anuCalendar";
 import {
   DAY_NAMES,
   DAYS,
-  SEMESTER,
   addDays,
   canberraNow,
   clashes,
@@ -16,8 +15,9 @@ import {
   nextClass,
   occursOn,
   periodOn,
+  semesterWeeks,
+  weekToShow,
   shortLocation,
-  teachingWeek,
 } from "../lib/timetable";
 
 const url = Astro.url;
@@ -43,9 +43,16 @@ const todo = groups.filter((g) => g.status !== "allocated" || g.waiting);
 // activity it belongs to is `activityId`, and the details page is per activity.
 const now = new Date();
 const here = canberraNow(now);
-const week = teachingWeek(here.date);
+// the week on the grid: ?week=<Monday> steps through the semester, else this week
+const shown = weekToShow(here.date, url.searchParams.get("week"));
+const weeks = semesterWeeks();
+// compare by date: semesterWeeks() builds fresh objects on every call
+const shownAt = weeks.findIndex((w) => w.monday === shown.monday);
+const thisWeek = weekToShow(here.date, null).monday;
+const week = shown.week;
+const weekHref = (monday: string) => `/?view=week&week=${monday}#week-h`;
 // Monday of the week shown: this week, or next week at the weekend
-const monday = addDays(here.date, here.weekday <= 5 ? 1 - here.weekday : 8 - here.weekday);
+const monday = shown.monday;
 const dayDates = DAYS.map((_, i) => addDays(monday, i));
 
 const sessionsOf = groups.flatMap((g) => {
@@ -57,7 +64,8 @@ const sessionsOf = groups.flatMap((g) => {
 });
 // a teaching week shows what runs that week (MyTT's dates skip breaks and
 // holidays); outside teaching weeks the grid shows the weekly pattern
-const entries = sessionsOf.filter((e) => !week || occursOn(e, dayDates[e.day - 1]));
+// only what MyTT's dates (less public holidays) run in the week shown; the break is empty
+const entries = sessionsOf.filter((e) => occursOn(e, dayDates[e.day - 1]));
 const notThisWeek = sessionsOf.filter((e) => !entries.includes(e) && !e.wait);
 const allocated = sessionsOf.filter((e) => !e.wait);
 
@@ -217,18 +225,58 @@ const label = (e: { view: { course: { code: string }; group: { label: string } }
       {
         view === "week" ? (
           <section class="card week-wrap" aria-labelledby="week-h" data-view="week">
-            <h2 id="week-h">
-              {week ? `Week ${week}` : "Your weekly pattern"}
+            <nav class="week-nav" aria-label="Semester weeks">
+              {shownAt > 0 ? (
+                <a class="button secondary" href={weekHref(weeks[shownAt - 1].monday)} data-step="prev">
+                  ← Previous<span class="visually-hidden"> week</span>
+                </a>
+              ) : (
+                <span class="button secondary is-edge" data-step="prev" data-edge>
+                  First week
+                </span>
+              )}
+              <ol class="week-chips">
+                {weeks.map((w) => (
+                  <li>
+                    <a
+                      href={weekHref(w.monday)}
+                      aria-current={w.monday === shown.monday ? "true" : undefined}
+                      class:list={{ brk: !w.week, now: w.monday === thisWeek }}
+                      data-week={w.monday}
+                    >
+                      {w.label}
+                      <span class="visually-hidden">
+                        {" "}
+                        · {w.title}, week of {shortDate(w.monday)}
+                        {w.monday === thisWeek ? " (this week)" : ""}
+                      </span>
+                    </a>
+                  </li>
+                ))}
+              </ol>
+              {shownAt < weeks.length - 1 ? (
+                <a class="button secondary" href={weekHref(weeks[shownAt + 1].monday)} data-step="next">
+                  Next<span class="visually-hidden"> week</span>{" "}→
+                </a>
+              ) : (
+                <span class="button secondary is-edge" data-step="next" data-edge>
+                  Last week
+                </span>
+              )}
+            </nav>
+            <h2 id="week-h" data-shown={shown.monday}>
+              {shown.title}
               <span class="muted" style="font-weight:400">
                 {" "}
                 · {shortDate(dayDates[0])} – {shortDate(dayDates[4])}
               </span>
             </h2>
-            {!week && (
+            {shown.monday !== thisWeek && (
               <p class="muted">
-                No classes run this week ({periodOn(here.date).toLowerCase()}); this is your weekly pattern.
+                <a class="link-target" href={weekHref(thisWeek)}>Back to this week</a>
               </p>
             )}
+            {!week && <p class="flash warn">Teaching break: no classes run from 7 to 18 September.</p>}
             {clashPairs.length > 0 && (
               <ul class="clash-list" role="list">
                 {clashPairs.map(([a, b]) => (
@@ -300,15 +348,19 @@ const label = (e: { view: { course: { code: string }; group: { label: string } }
             {week && notThisWeek.length > 0 && (
               <p class="muted not-this-week">
                 Not on this week:{" "}
-                {notThisWeek.map((e, i) => (
-                  <>
-                    {i > 0 && ", "}
-                    <a href={details(e)}>
-                      {e.view.course.code} {e.view.group.label}
-                    </a>
-                  </>
-                ))}
-                . Their dates skip it.
+                {notThisWeek.map((e, i) => {
+                  const holiday = holidayOn(dayDates[e.day - 1]);
+                  return (
+                    <>
+                      {i > 0 && ", "}
+                      <a href={details(e)}>
+                        {e.view.course.code} {e.view.group.label}
+                      </a>
+                      {holiday ? ` (${holiday.title})` : " (not in its MyTimetable dates)"}
+                    </>
+                  );
+                })}
+                .
               </p>
             )}
           </section>

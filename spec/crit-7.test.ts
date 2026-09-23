@@ -12,7 +12,7 @@ import {
 } from "../src/lib/timetable";
 import { type PlanGroup, plan, scorePlan } from "../src/lib/planner";
 import { KEY_DATES, isPublicHoliday } from "../src/lib/anuCalendar";
-import { isTeachingDay, periodOn } from "../src/lib/timetable";
+import { isTeachingDay, periodOn, semesterWeeks, weekToShow } from "../src/lib/timetable";
 
 // This week's own contract (crit 07, "Build the ANU system you wish
 // existed"): a rebuilt MyTimetable. The published spec's one mechanically
@@ -91,6 +91,75 @@ describe("details: every MyTimetable record has a page with all its fields", () 
     expect(await page("/?view=week")).toMatch(/href="\/activities\/[A-Z0-9]+-[A-Za-z]+-\d+\/"/);
     const overview = await page("/allocate/");
     for (const id of new Set(MYTT.map((r) => r.id))) expect(overview).toContain(`href="/activities/${id}/"`);
+  });
+});
+
+describe("every week of the semester, first to last, on ANU's calendar", () => {
+  // runs before anything changes the seeded (real) allocations
+  const week = (monday: string) => page(`/?view=week&week=${monday}`);
+  const on = (html: string, id: string) => html.includes(`data-activity="${id}"`);
+
+  it("offers all 14 weeks: 1-6, the two break weeks, 7-12", async () => {
+    const html = await week("2026-07-27");
+    const chips = [...html.matchAll(/data-week="([^"]+)"/g)].map((m) => m[1]);
+    expect(chips).toEqual([
+      "2026-07-27", "2026-08-03", "2026-08-10", "2026-08-17", "2026-08-24", "2026-08-31",
+      "2026-09-07", "2026-09-14",
+      "2026-09-21", "2026-09-28", "2026-10-05", "2026-10-12", "2026-10-19", "2026-10-26",
+    ]);
+  });
+
+  it("week 1 has the lectures but no tutorials that start later", async () => {
+    const html = await week("2026-07-27");
+    expect(html).toMatch(/<h2 id="week-h"[^>]*>\s*Week 1/);
+    expect(on(html, "PHIL1005-LecA-01")).toBe(true); // Mon 27 Jul
+    expect(on(html, "PHIL1005-TutA-07")).toBe(true); // starts Thu 30 Jul
+    expect(on(html, "COMP4020-TutA-02")).toBe(false); // starts Mon 3 Aug
+    expect(on(html, "COMP3900-TutA-07")).toBe(false); // starts Fri 7 Aug
+    expect(html).toContain('data-step="prev" data-edge'); // nothing before week 1
+    expect(html).toContain('href="/?view=week&amp;week=2026-08-03#week-h" data-step="next"'); // next is week 2
+    expect(html).toMatch(/aria-current="true"[^>]*data-week="2026-07-27"/);
+  });
+
+  it("steps both ways from the middle", async () => {
+    const html = await week("2026-09-21"); // week 7: previous is the second break week
+    expect(html).toContain('href="/?view=week&amp;week=2026-09-14#week-h" data-step="prev"');
+    expect(html).toContain('href="/?view=week&amp;week=2026-09-28#week-h" data-step="next"');
+    expect(html).toMatch(/aria-current="true"[^>]*data-week="2026-09-21"/);
+  });
+
+  it("week 2 adds COMP4020 TutA (Mon 3 Aug) and COMP3900 TutA (Fri 7 Aug)", async () => {
+    expect(on(await week("2026-08-03"), "COMP4020-TutA-02")).toBe(true);
+    expect(on(await week("2026-08-03"), "COMP3900-TutA-07")).toBe(true); // Fri 7 Aug is still week 2
+  });
+
+  it("the break weeks are empty and say so", async () => {
+    for (const monday of ["2026-09-07", "2026-09-14"]) {
+      const html = await week(monday);
+      expect(html).toMatch(/<h2 id="week-h"[^>]*>\s*Teaching break/);
+      expect(html).not.toMatch(/class="event[^"]*"[^>]*data-activity=/);
+    }
+  });
+
+  it("week 9 marks Labour Day and drops that Monday's classes only", async () => {
+    const html = await week("2026-10-05");
+    expect(html).toMatch(/<h2 id="week-h"[^>]*>\s*Week 9/);
+    expect(html).toContain('data-holiday="2026-10-05"');
+    expect(on(html, "PHIL1005-LecA-01")).toBe(false); // Mon
+    expect(on(html, "COMP3900-LecA-01")).toBe(false); // Mon
+    expect(on(html, "PHIL1005-LecB-01")).toBe(true); // Wed 7 Oct
+  });
+
+  it("week 12 is the last, and has Friday 30 October's tutorial", async () => {
+    const html = await week("2026-10-26");
+    expect(html).toMatch(/<h2 id="week-h"[^>]*>\s*Week 12/);
+    expect(on(html, "COMP3900-TutA-07")).toBe(true);
+    expect(html).toContain('data-step="next" data-edge'); // nothing after week 12
+  });
+
+  it("ignores a week that isn't a semester Monday", async () => {
+    const res = await fetch(new URL("/?view=week&week=2027-01-04", baseUrl));
+    expect(res.status).toBe(200);
   });
 });
 
@@ -396,6 +465,17 @@ describe("fixtures", () => {
     expect(occurrences(sample)).toHaveLength(11); // 6 Mondays, then 6 less Labour Day
     const ics = toICS([{ ...sample, uid: "s@y", summary: "S", location: "L" }], new Date("2026-09-23T00:00:00Z"));
     expect(ics).toContain("EXDATE;TZID=Australia/Sydney:20261005T100000");
+  });
+
+  it("picks the week to show: asked for, else this week, clamped to the semester", () => {
+    expect(semesterWeeks()).toHaveLength(14);
+    expect(weekToShow("2026-09-23", null).monday).toBe("2026-09-21"); // a Wednesday
+    expect(weekToShow("2026-09-26", null).monday).toBe("2026-09-28"); // a Saturday: next week
+    expect(weekToShow("2026-07-01", null).monday).toBe("2026-07-27"); // before: week 1
+    expect(weekToShow("2026-11-10", null).monday).toBe("2026-10-26"); // exams: week 12
+    expect(weekToShow("2026-09-23", "2026-08-10").title).toBe("Week 3");
+    expect(weekToShow("2026-09-23", "2026-09-14").title).toBe("Teaching break");
+    expect(weekToShow("2026-09-23", "2026-08-11").monday).toBe("2026-09-21"); // not a Monday: ignored
   });
 
   it("numbers teaching weeks around the two-week break", () => {

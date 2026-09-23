@@ -604,3 +604,28 @@ details.dates summary { cursor: pointer; font-weight: 600; min-height: 2.75rem; 
   .date-table li { grid-template-columns: minmax(0, 1fr); }
   .date-table .kd-kind { text-align: left; }
 }
+
+/* stepping through the semester's weeks */
+.week-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-bottom: 1rem; }
+.week-nav > .button { min-height: 2.5rem; padding: 0 0.8rem; }
+.week-nav > .is-edge { color: var(--unigrey); border-color: var(--line); cursor: default; }
+.week-nav > .is-edge:hover { background: var(--white); }
+.week-chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.25rem; flex: 1 1 18rem; }
+.week-chips a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.5rem;
+  min-height: 2.5rem;
+  padding: 0 0.4rem;
+  border: 1px solid var(--black);
+  color: var(--black);
+  text-decoration: none;
+  font-weight: 600;
+}
+.week-chips a.brk { border-style: dashed; font-weight: 400; font-size: 0.85rem; }
+.week-chips a.now { box-shadow: inset 0 -3px 0 var(--gold); }
+.week-chips a[aria-current="true"] { background: var(--black); color: var(--white); }
+.week-chips a:hover { background: var(--tint); }
+.week-chips a[aria-current="true"]:hover { background: var(--unigrey); }
+@media (max-width: 30rem) { .week-nav > .button { flex: 1 1 40%; } .week-chips { order: 3; flex-basis: 100%; } }

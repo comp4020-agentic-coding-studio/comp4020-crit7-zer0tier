@@ -453,3 +453,11 @@ authority's own page before settling for a summary of it.
 The Labour Day week can't be seen on any other date. A throwaway
 preload (`node --import /tmp/fake.mjs`, overriding `Date`, with FAKE_NOW
 set) rendered it without adding a test-only switch to the app.
+
+### Don't compare freshly built objects by identity
+
+`weeks.indexOf(shown)` was always -1, because `semesterWeeks()` builds new
+objects on every call. So Previous, Next and the current-week highlight
+were all wrong, and every check stayed green until a test asserted the
+week-1 Next link's literal URL. Compare by a key (`w.monday`), and test
+navigation by its literal targets, not only by what's on the page.

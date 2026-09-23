@@ -313,3 +313,35 @@ export function shortLocation(location: string): string {
   const n = building?.match(/Bldg (\w+)/)?.[1];
   return n && /^Rm\b/.test(room) ? `${room}, Bldg ${n}` : room;
 }
+
+export interface SemesterWeek {
+  monday: string; // ISO date
+  label: string; // "1".."12", or "Break"
+  week: number | null; // teaching week number, null in the break
+  title: string; // "Week 3" or "Teaching break"
+}
+
+/** Every week of the semester, Monday to Monday, labelled as ANU's calendar has them. */
+export function semesterWeeks(): SemesterWeek[] {
+  const out: SemesterWeek[] = [];
+  for (let m: string = SEMESTER.firstDay; m <= SEMESTER.lastDay; m = addDays(m, 7)) {
+    const week = teachingWeek(m);
+    out.push({ monday: m, week, label: week ? String(week) : "Break", title: week ? `Week ${week}` : "Teaching break" });
+  }
+  return out;
+}
+
+/**
+ * The week to show: the one asked for, if it's a semester Monday; else the
+ * week holding `today` (the next one at a weekend), clamped to the
+ * semester's first and last weeks.
+ */
+export function weekToShow(today: string, asked: string | null): SemesterWeek {
+  const weeks = semesterWeeks();
+  const pick = weeks.find((w) => w.monday === asked);
+  if (pick) return pick;
+  const wd = new Date(`${today}T00:00:00Z`).getUTCDay() || 7;
+  const monday = addDays(today, wd <= 5 ? 1 - wd : 8 - wd);
+  if (monday < weeks[0].monday) return weeks[0];
+  return weeks.find((w) => w.monday === monday) ?? weeks[weeks.length - 1];
+}

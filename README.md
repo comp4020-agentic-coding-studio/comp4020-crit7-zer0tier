@@ -64,6 +64,11 @@ data, so plans that use them say so.
 - **ANU dates:** a card lists the next official dates, such as the Labour
   Day holiday and the last day to drop without failure, and links to all
   of them.
+- **Every week, first to last:** the week view steps through all 14
+  weeks of the semester: 1–6, the two break weeks, then 7–12. Use the
+  week buttons or Previous and Next. Each week shows only the classes
+  your MyTimetable dates list for it, so week 1 has no COMP4020 or
+  COMP3900 tutorials yet. The break weeks are empty and say so.
 - **Public holidays:** no class runs on one, even inside a class's date
   range. This applies on the grid, on the details pages and in the
   calendar feed.
