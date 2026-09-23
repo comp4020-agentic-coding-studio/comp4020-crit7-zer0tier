@@ -18,7 +18,7 @@ const statusText = { allocated: "Allocated", pending: "Wait list", unallocated: 
   <div class="course-list">
     {
       courses.map((c) => (
-        <section class={`card course-card hue-${c.hue}`} aria-labelledby={`c-${c.code}`}>
+        <section class="card course-card" aria-labelledby={`c-${c.code}`}>
           <header>
             <h2 id={`c-${c.code}`}>
               <span class="code">{c.code}</span> {c.title}

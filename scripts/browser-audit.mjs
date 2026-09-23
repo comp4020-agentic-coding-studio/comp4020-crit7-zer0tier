@@ -11,6 +11,7 @@
 //     label is measured by its label, the real hit area)
 //   - any axe-core violation, colour-contrast included
 //   - a skip link whose focused box is off-screen or tiny
+//   - Public Sans (ANU's web typeface) not actually loaded
 // Usage: pnpm build && pnpm audit:browser   (WIDTHS=390,1920 to narrow it)
 // Needs a Chromium: `pnpm exec playwright install chromium-headless-shell`.
 // On WSL without libasound, put an extracted libasound2 on LD_LIBRARY_PATH.
@@ -95,6 +96,8 @@ try {
           .map(name);
         const small = [...document.querySelectorAll("a[href],button,input,summary,label.option,label.choice")]
           .filter((el) => !(el.tagName === "INPUT" && el.closest("label.option,label.choice")))
+          // WCAG 2.5.8's inline exception: a link inside a sentence of prose
+          .filter((el) => !(el.tagName === "A" && el.closest(".prose p, .prose li") && getComputedStyle(el).display === "inline"))
           .filter((el) => shown(el) && !el.closest(".visually-hidden") && !el.classList.contains("skip"))
           .filter((el) => {
             const b = el.getBoundingClientRect();
@@ -109,6 +112,13 @@ try {
         return { sw: document.documentElement.scrollWidth, iw, over, clipped, small, tiny, hiddenShown };
       });
       const at = `${w} ${r}`;
+      // the brand typeface must be the one actually rendering, not a fallback
+      const font = await page.evaluate(async () => {
+        await document.fonts.ready;
+        const loaded = [...document.fonts].some((f) => f.family.includes("Public Sans") && f.status === "loaded");
+        return { loaded, family: getComputedStyle(document.body).fontFamily };
+      });
+      if (!font.loaded || !font.family.includes("Public Sans")) fail(`${at} Public Sans not rendering (${font.family})`);
       if (m.sw !== m.iw) fail(`${at} scrollWidth ${m.sw} != innerWidth ${m.iw}`);
       if (m.over.length) fail(`${at} crosses the right edge: ${m.over.slice(0, 4).join("; ")}`);
       if (m.clipped.length) fail(`${at} clipped: ${m.clipped.slice(0, 4).join("; ")}`);

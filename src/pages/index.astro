@@ -161,7 +161,7 @@ const label = (e: { view: { course: { code: string }; group: { label: string } }
         <div class="status">
           <a class="ok" href="/allocate/"><strong>{counts.allocated}</strong> Allocated</a>
           <a class="warn" href="/allocate/" data-count="pending"><strong>{counts.pending}</strong> On a wait list</a>
-          <a class="bad" href="/allocate/"><strong>{counts.unallocated}</strong> Still to choose</a>
+          <a class:list={["bad", { zero: counts.unallocated === 0 }]} href="/allocate/"><strong>{counts.unallocated}</strong> Still to choose</a>
         </div>
       </section>
 
@@ -219,6 +219,11 @@ const label = (e: { view: { course: { code: string }; group: { label: string } }
                 ))}
               </ul>
             )}
+            <ul class="legend" aria-label="Key">
+              <li class="kind-lecture">Lecture</li>
+              <li class="kind-tutorial">Tutorial</li>
+              <li class="wait-key">Wait list</li>
+            </ul>
             <div class="week" style={`--rows:${rows}`}>
               <div class="gutter" aria-hidden="true">
                 {Array.from({ length: rows / 2 }, (_, i) => (
@@ -234,12 +239,13 @@ const label = (e: { view: { course: { code: string }; group: { label: string } }
                   <section class:list={["day", { "is-today": isToday }]} style={`--lanes:${laneCount[i]}`} aria-label={`${DAY_NAMES[i]} ${shortDate(dayDates[i])}`}>
                     <h3 class:list={["day-head", { today: isToday }]}>
                       {d} <span class="date">{shortDate(dayDates[i])}</span>
+                      {isToday && <span class="visually-hidden"> (today)</span>}
                     </h3>
                     <div class="day-body" aria-hidden="true" />
                     {items.length === 0 && <p class="empty-day">No classes</p>}
                     {items.map((e) => (
                       <article
-                        class:list={["event", `hue-${e.view.course.hue}`, { wait: e.wait, done: e.id === done, clash: clashing.has(e) }]}
+                        class:list={["event", `kind-${e.view.group.kind.toLowerCase()}`, { wait: e.wait, done: e.id === done, clash: clashing.has(e) }]}
                         style={`grid-row:${row(e.start)} / ${row(e.end)};grid-column:${clashing.has(e) ? `${(lanes.get(e) ?? 0) + 1} / span 1` : "1 / -1"}`}
                         data-activity={e.id}
                       >
@@ -270,7 +276,7 @@ const label = (e: { view: { course: { code: string }; group: { label: string } }
             ) : (
               <ul class="agenda">
                 {agenda.map((e) => (
-                  <li class={`hue-${e.view.course.hue}`} data-activity={e.id}>
+                  <li class={`kind-${e.view.group.kind.toLowerCase()}`} data-activity={e.id}>
                     <span class="t">
                       {fmtTime(e.start)}–{fmtTime(e.end)}
                     </span>

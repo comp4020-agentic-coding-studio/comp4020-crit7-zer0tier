@@ -370,3 +370,19 @@ database, drives the core flow, then checks nine widths. It's not in
 UI. It needs `pnpm exec playwright install chromium-headless-shell`. On this
 WSL machine it also needs `libasound2` extracted with
 `apt download libasound2t64 && dpkg -x` and put on `LD_LIBRARY_PATH`.
+
+### A computed `font-family` names the font you asked for, not the one drawn
+
+With the webfont import removed, `getComputedStyle(body).fontFamily` still
+read `"Public Sans Variable", sans-serif` while the page rendered in the
+fallback. Check `document.fonts` for a loaded face instead.
+`pnpm audit:browser` does this now.
+
+### Brand palettes are small; don't smuggle colours back in
+
+ANU's web palette is black, white, Gold `#BE830E`, Gold tint `#F5EDDE` and
+Unigrey `#333333` text. It has no status colours, and gold text on white
+is only allowed at 24px, or 19px semibold, and up (3.26:1). Carry state with
+words, weight and black/tint/white, and use gold for rules and borders. Take
+brand values from webpublishing.anu.edu.au, not memory. Never use the ANU
+crest on a student site.

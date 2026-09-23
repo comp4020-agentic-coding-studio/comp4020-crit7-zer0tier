@@ -45,5 +45,15 @@ app uses the Programs and Courses title.
 | No sideways scroll, nothing clipped, 24px targets, 12px text, axe incl. contrast | `pnpm audit:browser`, in Chromium at nine widths |
 | Whether it's actually easier than MyTT | judgement: the crit |
 
+**ANU's own web style.** Colours and type follow the
+[ANU Web Style Guide](https://webpublishing.anu.edu.au/web-style-guide/colours).
+Everything is black and white, with ANU Gold `#BE830E` as a sparing highlight
+and Gold tint `#F5EDDE` for panels. Text is black, with Unigrey `#333333` for
+muted lines. The typeface is Public Sans, self-hosted. The guide has no
+status or secondary colours, so courses are told apart by their codes and
+state is carried by words and weight. An event's left edge marks a lecture
+(black) or a tutorial (gold). The ANU crest and logo are deliberately left
+out: this is a student prototype, not an ANU service.
+
 **Not built:** sign-in and more than one student, swapping with another
 student, sessional (X1–X4) courses, and any connection to the real MyTT.
