@@ -439,3 +439,17 @@ empty plan was accepted as "0 changes".
 means, with its weights on the page, and the fixtures pin those rules
 down with hand-worked scores. A definition the reader can check beats one
 only the code knows.
+
+### Prefer the official source, and replace a second-hand one when it appears
+
+The teaching break first came from a college planner and a student
+accommodation guide, because the official calendar page didn't come up
+in search. Fetched directly, ANU's University Calendar confirmed those
+dates and added one they lacked: Labour Day, 5 October. Fetch the
+authority's own page before settling for a summary of it.
+
+### To see a date-dependent page, shift the server's clock, not the app
+
+The Labour Day week can't be seen on any other date. A throwaway
+preload (`node --import /tmp/fake.mjs`, overriding `Date`, with FAKE_NOW
+set) rendered it without adding a test-only switch to the app.

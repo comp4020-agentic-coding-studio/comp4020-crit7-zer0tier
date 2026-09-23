@@ -569,3 +569,38 @@ details.dates summary { cursor: pointer; font-weight: 600; min-height: 2.75rem; 
 .plan + .plan { margin-top: 0; }
 /* on one column, preferences come before the plans they shape */
 @media (max-width: 79.99rem) { .planner-layout > aside { order: -1; } }
+
+/* ANU calendar */
+.holiday {
+  grid-row: 2 / span 4;
+  grid-column: 1 / -1;
+  z-index: 1;
+  margin: 2px;
+  padding: 0.3rem 0.45rem;
+  background: var(--black);
+  color: var(--white);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+@media (max-width: 59.99rem) { .holiday { margin: 0; } }
+.key-dates { list-style: none; margin: 0 0 0.5rem; padding: 0; display: grid; gap: 0.5rem; }
+.key-dates li { display: grid; gap: 0.05rem; padding-left: 0.6rem; border-left: 4px solid var(--line); font-size: 0.925rem; }
+.key-dates .kd-when, .date-table .kd-when { font-weight: 700; }
+.kd-deadline { border-left-color: var(--gold) !important; }
+.kd-holiday, .kd-exam { border-left-color: var(--black) !important; }
+.date-table { list-style: none; margin: 0 0 1rem; padding: 0; }
+.date-table li {
+  display: grid;
+  grid-template-columns: minmax(0, 16rem) minmax(0, 1fr) 8rem;
+  gap: 0.25rem 1rem;
+  padding: 0.6rem 0.75rem;
+  border-left: 4px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.date-table li.past { color: var(--unigrey); }
+.date-table li.next { background: var(--tint); }
+.date-table .kd-kind { font-size: 0.85rem; color: var(--unigrey); text-align: right; }
+@media (max-width: 40rem) {
+  .date-table li { grid-template-columns: minmax(0, 1fr); }
+  .date-table .kd-kind { text-align: left; }
+}

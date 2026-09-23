@@ -19,7 +19,8 @@ timetable, so the app offers three routes, all on the home page:
   database so it holds on every device
 - a web manifest, so **Add to Home Screen** opens it like an app
 - a **calendar feed** (`/calendar.ics`) of every allocated class, weekly
-  through the semester, skipping the 7–18 September teaching break
+  through the semester, skipping the 7–18 September teaching break and
+  the Labour Day public holiday
 
 A fourth shortcut goes to each course's official summary on ANU Programs
 and Courses. It's linked from the Quick access panel, every class's details
@@ -56,6 +57,20 @@ the whole plan or none of it. "Fair" means fair to your week. The planner
 can't know other students' needs, and alternative tutorial times are sample
 data, so plans that use them say so.
 
+**ANU's real calendar.** Semester 2, 2026 follows ANU's official
+[University Calendar 2026](https://www.anu.edu.au/directories/university-calendar?year=2026):
+- **Header:** names the current period, such as "Teaching week 7", the
+  teaching break or the exam period.
+- **ANU dates:** a card lists the next official dates, such as the Labour
+  Day holiday and the last day to drop without failure, and links to all
+  of them.
+- **Public holidays:** no class runs on one, even inside a class's date
+  range. This applies on the grid, on the details pages and in the
+  calendar feed.
+
+The calendar doesn't number weeks. Numbering 1–6 and 7–12 either side of
+the break follows ANU's usual convention.
+
 **True where it claims to be.** The eight allocated activities are the
 student's real MyTimetable records, copied field for field on 23 September
 2026. One correction: the export printed "O?Donoghue", a lost apostrophe.
@@ -80,6 +95,7 @@ Programs and Courses title.
 | Each real record's details page carries every MyTT field | `spec/crit-7.test.ts`, against a table transcribed separately from the seed |
 | Clash rule is half-open (9–10 and 10–11 don't clash); week numbers; next class; `.ics` output | literal fixtures in `spec/crit-7.test.ts` |
 | No sideways scroll, nothing clipped, 24px targets, 12px text, axe incl. contrast | `pnpm audit:browser`, in Chromium at nine widths |
+| Official Semester 2 dates, the current period, no classes on public holidays | literal dates from the University Calendar in `spec/crit-7.test.ts` |
 | Planner ranks by spread, gaps and preferences; never a clash or full class; applies all or nothing | fixtures with hand-worked scores, and HTTP tests, in `spec/crit-7.test.ts` |
 | Whether it's actually easier than MyTT | judgement: the crit |
 

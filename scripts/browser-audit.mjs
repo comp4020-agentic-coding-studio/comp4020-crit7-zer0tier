@@ -51,7 +51,7 @@ for (let i = 0; ; i++) {
 }
 
 const axeSrc = readFileSync("node_modules/axe-core/axe.min.js", "utf8");
-const routes = ["/?view=week", "/?view=today", "/allocate/", "/courses/COMP3900/", "/courses/PHIL1005/", "/activities/COMP3900-TutA-07/", "/activities/PHIL1005-LecA-01/", "/planner/", "/readme/"];
+const routes = ["/?view=week", "/?view=today", "/allocate/", "/courses/COMP3900/", "/courses/PHIL1005/", "/activities/COMP3900-TutA-07/", "/activities/PHIL1005-LecA-01/", "/planner/", "/dates/", "/readme/"];
 const widths = (process.env.WIDTHS ?? "320,390,767,961,1279,1281,1440,1920,2560").split(",").map(Number);
 let failures = 0;
 let pages = 0;

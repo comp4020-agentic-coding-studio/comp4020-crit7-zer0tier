@@ -11,6 +11,8 @@ import {
   toICS,
 } from "../src/lib/timetable";
 import { type PlanGroup, plan, scorePlan } from "../src/lib/planner";
+import { KEY_DATES, isPublicHoliday } from "../src/lib/anuCalendar";
+import { isTeachingDay, periodOn } from "../src/lib/timetable";
 
 // This week's own contract (crit 07, "Build the ANU system you wish
 // existed"): a rebuilt MyTimetable. The published spec's one mechanically
@@ -209,6 +211,38 @@ describe("where: each real class shows its building on a map", () => {
   });
 });
 
+describe("the real ANU calendar: Semester 2, 2026", () => {
+  it("lists every official Semester 2 date, with its source", async () => {
+    const html = await page("/dates/");
+    for (const title of [
+      "Semester 2 begins",
+      "Last day to add Semester 2 courses",
+      "Semester 2 census date",
+      "Teaching break",
+      "Labour Day public holiday",
+      "Last day to drop Semester 2 courses without failure",
+      "Semester 2 ends",
+      "Semester 2 examination period",
+      "Results from Semester 2 published",
+    ]) expect(html).toContain(title);
+    expect(html).toContain('href="https://www.anu.edu.au/directories/university-calendar?year=2026"');
+  });
+
+  it("names the current period on the timetable, and shows upcoming ANU dates", async () => {
+    const html = await page("/");
+    expect(html).toMatch(/data-period>[^<]+</);
+    expect(html).toContain('href="/dates/"');
+  });
+
+  it("leaves Labour Day out of a Monday sample class and the calendar feed", async () => {
+    // COMP3500 LecA is sample data on Mondays 10-12 across every teaching week
+    const details = await page("/activities/COMP3500-LecA-01/");
+    expect(details).not.toContain("Mon, 5 Oct");
+    expect(details).toContain("Mon, 12 Oct");
+    expect(await page("/calendar.ics")).toContain("EXDATE;TZID=Australia/Sydney:20261005T100000");
+  });
+});
+
 describe("quick access: the saved home view persists", () => {
   it("opens to the week by default, and to Today once saved", async () => {
     expect(await page("/")).toContain('data-view="week"');
@@ -329,6 +363,39 @@ describe("fixtures", () => {
 
   it("prints durations as MyTimetable does", () => {
     expect([30, 60, 90, 120].map(fmtDuration)).toEqual(["0.5 hr", "1 hr", "1.5 hrs", "2 hrs"]);
+  });
+
+  it("follows ANU's University Calendar 2026 (literal dates from its page)", () => {
+    const on = (title: string) => KEY_DATES.find((d) => d.title === title);
+    expect(on("Semester 2 begins")?.date).toBe("2026-07-27");
+    expect(on("Semester 2 census date")?.date).toBe("2026-08-31");
+    expect(on("Teaching break")).toMatchObject({ date: "2026-09-07", end: "2026-09-18" });
+    expect(on("Last day to drop Semester 2 courses without failure")?.date).toBe("2026-10-09");
+    expect(on("Semester 2 ends")?.date).toBe("2026-10-30");
+    expect(on("Semester 2 examination period")).toMatchObject({ date: "2026-11-05", end: "2026-11-21" });
+    expect(isPublicHoliday("2026-10-05")).toBe(true); // Labour Day
+    expect(isTeachingDay("2026-10-05")).toBe(false);
+    expect(isTeachingDay("2026-10-06")).toBe(true);
+  });
+
+  it("names the period a date falls in", () => {
+    expect(periodOn("2026-07-21")).toBe("Orientation Week");
+    expect(periodOn("2026-07-27")).toBe("Teaching week 1");
+    expect(periodOn("2026-09-10")).toBe("Teaching break");
+    expect(periodOn("2026-09-23")).toBe("Teaching week 7");
+    expect(periodOn("2026-11-02")).toBe("Semester 2 has ended · exams begin 5 November");
+    expect(periodOn("2026-11-10")).toBe("Examination period");
+    expect(periodOn("2026-11-30")).toBe("Deferred examination period");
+    expect(periodOn("2026-12-20")).toBe("After Semester 2");
+  });
+
+  it("never runs a class on a public holiday, even inside its date range", () => {
+    const sample = { day: 1, start: h(10), end: h(12), dates: "27/7-4/9, 21/9-30/10" };
+    expect(occursOn(sample, "2026-10-05")).toBe(false);
+    expect(occursOn(sample, "2026-10-12")).toBe(true);
+    expect(occurrences(sample)).toHaveLength(11); // 6 Mondays, then 6 less Labour Day
+    const ics = toICS([{ ...sample, uid: "s@y", summary: "S", location: "L" }], new Date("2026-09-23T00:00:00Z"));
+    expect(ics).toContain("EXDATE;TZID=Australia/Sydney:20261005T100000");
   });
 
   it("numbers teaching weeks around the two-week break", () => {

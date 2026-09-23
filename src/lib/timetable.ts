@@ -2,6 +2,8 @@
 // "what's next", and the .ics feed. Kept apart from db.ts so spec/ can test
 // it against literal expected answers.
 
+import { KEY_DATES, isPublicHoliday } from "./anuCalendar";
+
 export interface Slot {
   day: number; // 1 = Monday ... 5 = Friday
   start: number; // minutes after midnight, Canberra time
@@ -28,10 +30,12 @@ export function fmtSlot(s: Slot): string {
   return `${DAYS[s.day - 1]} ${fmtTime(s.start)}–${fmtTime(s.end)}`;
 }
 
-// Semester 2, 2026. Class dates are from Programs and Courses (27 Jul - 30
-// Oct 2026 for all four courses modelled); the two-week teaching break,
-// 7-18 Sep, is from the ANU CBE Student Engagement Planner 2026, which
-// numbers 21 Sep as Week 7. Dates are ISO local (Canberra) calendar dates.
+// Semester 2, 2026, from ANU's official University Calendar 2026 (see
+// anuCalendar.ts): begins 27 Jul, teaching break from 7 Sep with return
+// 21 Sep, ends 30 Oct. The calendar doesn't number weeks; numbering the
+// weeks either side of the break 1-6 and 7-12 is ANU's usual convention
+// (the CBE Student Engagement Planner 2026 calls 21 Sep Week 7). Dates are
+// ISO local (Canberra) calendar dates.
 export const SEMESTER = {
   name: "Semester 2, 2026",
   firstDay: "2026-07-27",
@@ -41,6 +45,7 @@ export const SEMESTER = {
 } as const;
 
 export const TZ = "Australia/Sydney"; // Canberra keeps Sydney time
+
 
 /** Canberra local date (YYYY-MM-DD), weekday (1=Mon..7=Sun) and minutes for an instant. */
 export function canberraNow(now: Date): { date: string; weekday: number; minutes: number } {
@@ -76,14 +81,31 @@ export function addDays(date: string, n: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** A weekday inside the semester and outside the break. */
+/** A weekday inside the semester, outside the break, and not a public holiday. */
 export function isTeachingDay(date: string): boolean {
   return (
     date >= SEMESTER.firstDay &&
     date <= SEMESTER.lastDay &&
     !(date >= SEMESTER.breakFirst && date <= SEMESTER.breakLast) &&
-    weekdayOf(date) <= 5
+    weekdayOf(date) <= 5 &&
+    !isPublicHoliday(date)
   );
+}
+
+/** What part of ANU's year a date falls in, in the calendar's own terms. */
+export function periodOn(date: string): string {
+  const inRange = (title: string) => {
+    const d = KEY_DATES.find((k) => k.title === title);
+    return d ? date >= d.date && date <= (d.end ?? d.date) : false;
+  };
+  if (inRange("ANU Orientation Week")) return "Orientation Week";
+  if (inRange("Teaching break")) return "Teaching break";
+  const week = teachingWeek(date);
+  if (week) return `Teaching week ${week}`;
+  if (inRange("Semester 2 examination period")) return "Examination period";
+  if (inRange("Semester 2 deferred examination period")) return "Deferred examination period";
+  if (date > SEMESTER.lastDay && date < "2026-11-05") return "Semester 2 has ended · exams begin 5 November";
+  return date < SEMESTER.firstDay ? "Before Semester 2" : "After Semester 2";
 }
 
 /** Teaching week number for a date, or null outside teaching weeks. */
@@ -119,16 +141,20 @@ export function parseDates(dates: string): { from: string; to: string }[] {
     });
 }
 
-/** Whether a session runs on a date: its weekday, inside one of its ranges. */
+/** Whether a session runs on a date: its weekday, inside one of its ranges, not a public holiday. */
 export function occursOn(s: Dated, date: string): boolean {
-  return weekdayOf(date) === s.day && parseDates(s.dates).some((r) => date >= r.from && date <= r.to);
+  return (
+    weekdayOf(date) === s.day &&
+    !isPublicHoliday(date) &&
+    parseDates(s.dates).some((r) => date >= r.from && date <= r.to)
+  );
 }
 
 /** Every date a session runs, in order. */
 export function occurrences(s: Dated): string[] {
   const out: string[] = [];
   for (const r of parseDates(s.dates)) {
-    for (let d = r.from; d <= r.to; d = addDays(d, 1)) if (weekdayOf(d) === s.day) out.push(d);
+    for (let d = r.from; d <= r.to; d = addDays(d, 1)) if (weekdayOf(d) === s.day && !isPublicHoliday(d)) out.push(d);
   }
   return out;
 }
@@ -219,6 +245,13 @@ const compact = (date: string) => date.replaceAll("-", "");
 const hhmm = (m: number) =>
   `${String(Math.floor(m / 60)).padStart(2, "0")}${String(m % 60).padStart(2, "0")}00`;
 
+/** Public holidays that would otherwise fall inside a weekly range. */
+function exdates(e: Dated, r: { from: string; to: string }): string[] {
+  const hit = [];
+  for (let d = r.from; d <= r.to; d = addDays(d, 1)) if (weekdayOf(d) === e.day && isPublicHoliday(d)) hit.push(d);
+  return hit.length ? [`EXDATE;TZID=${TZ}:${hit.map((d) => `${compact(d)}T${hhmm(e.start)}`).join(",")}`] : [];
+}
+
 export function toICS(entries: CalendarEntry[], stamp: Date): string {
   const dtstamp = `${stamp.toISOString().replace(/[-:]/g, "").slice(0, 15)}Z`;
   const lines = [
@@ -246,6 +279,7 @@ export function toICS(entries: CalendarEntry[], stamp: Date): string {
         // UNTIL is UTC; 23:59:59Z on the last day is still before the
         // following week's class, so the last day is included and no more
         `RRULE:FREQ=WEEKLY;UNTIL=${compact(r.to)}T235959Z`,
+        ...exdates(e, r),
         `SUMMARY:${escapeText(e.summary)}`,
         `LOCATION:${escapeText(e.location)}`,
         ...(e.description ? [`DESCRIPTION:${escapeText(e.description)}`] : []),

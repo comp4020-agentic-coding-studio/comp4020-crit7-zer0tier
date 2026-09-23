@@ -2,6 +2,7 @@
 import CourseSummaryLink from "../components/CourseSummaryLink.astro";
 import Layout from "../components/Layout.astro";
 import { type HomeView, getHomeView, listCourses, listGroups } from "../lib/db";
+import { holidayOn, upcoming } from "../lib/anuCalendar";
 import {
   DAY_NAMES,
   DAYS,
@@ -14,6 +15,7 @@ import {
   fmtTime,
   nextClass,
   occursOn,
+  periodOn,
   shortLocation,
   teachingWeek,
 } from "../lib/timetable";
@@ -106,6 +108,9 @@ const agendaIsToday = agendaDate === here.date;
 const doneEntry = done ? sessionsOf.find((e) => e.activityId === done) : undefined;
 const waitEntry = waited ? sessionsOf.find((e) => e.activityId === waited) : undefined;
 const details = (e: { activityId: string }) => `/activities/${e.activityId}/`;
+const dayMonth = (d: string) =>
+  new Date(`${d}T00:00:00Z`).toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
+const dateRange = (k: { date: string; end?: string }) => (k.end ? `${dayMonth(k.date)} – ${dayMonth(k.end)}` : dayMonth(k.date));
 const kindClass = (e: { activityType: string }) => (e.activityType === "Lecture" ? "kind-lecture" : "kind-tutorial");
 const feedPath = "/calendar.ics";
 const label = (e: { view: { course: { code: string }; group: { label: string } }; number: string; part: string }) =>
@@ -139,7 +144,7 @@ const label = (e: { view: { course: { code: string }; group: { label: string } }
     <div>
       <h1>My timetable</h1>
       <p class="muted">
-        {SEMESTER.name} · {week ? `Teaching week ${week}` : "Not a teaching week"} · {longDate(here.date)}
+        <span data-period>{periodOn(here.date)}</span> · {longDate(here.date)}
       </p>
     </div>
     <nav class="tabs" aria-label="Timetable view">
@@ -221,7 +226,7 @@ const label = (e: { view: { course: { code: string }; group: { label: string } }
             </h2>
             {!week && (
               <p class="muted">
-                No classes run this week ({here.date >= SEMESTER.breakFirst && here.date <= SEMESTER.breakLast ? "teaching break" : "outside the semester"}); this is your weekly pattern.
+                No classes run this week ({periodOn(here.date).toLowerCase()}); this is your weekly pattern.
               </p>
             )}
             {clashPairs.length > 0 && (
@@ -261,7 +266,12 @@ const label = (e: { view: { course: { code: string }; group: { label: string } }
                       {isToday && <span class="visually-hidden"> (today)</span>}
                     </h3>
                     <div class="day-body" aria-hidden="true" />
-                    {items.length === 0 && <p class="empty-day">No classes</p>}
+                    {week && holidayOn(dayDates[i]) && (
+                      <p class="holiday" data-holiday={dayDates[i]}>
+                        {holidayOn(dayDates[i])?.title} · no classes
+                      </p>
+                    )}
+                    {items.length === 0 && !(week && holidayOn(dayDates[i])) && <p class="empty-day">No classes</p>}
                     {items.map((e) => (
                       <a
                         href={details(e)}
@@ -383,7 +393,7 @@ const label = (e: { view: { course: { code: string }; group: { label: string } }
           <h3>Subscribe in your calendar</h3>
           <p>
             Paste this into Google Calendar, Outlook or Apple Calendar. It carries every allocated class
-            for the semester and skips the teaching break.
+            for the semester and skips the teaching break and public holidays.
           </p>
           <div class="copy-row">
             <label for="feed" class="visually-hidden">Calendar subscription URL</label>
@@ -392,6 +402,19 @@ const label = (e: { view: { course: { code: string }; group: { label: string } }
           </div>
           <p><a class="tap" href={feedPath}>Download the .ics file</a></p>
         </section>
+      </section>
+
+      <section class="card anu-dates" aria-labelledby="dates-h">
+        <h2 id="dates-h">ANU dates</h2>
+        <ul class="key-dates">
+          {upcoming(here.date).slice(0, 4).map((d) => (
+            <li class={`kd-${d.kind}`}>
+              <span class="kd-when">{dateRange(d)}</span>
+              <span>{d.title}</span>
+            </li>
+          ))}
+        </ul>
+        <p><a class="link-target" href="/dates/">All Semester 2 dates</a></p>
       </section>
 
       <details class="card notices">

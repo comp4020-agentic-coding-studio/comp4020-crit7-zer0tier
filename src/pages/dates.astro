@@ -1,0 +1,48 @@
+---
+// Semester 2, 2026 as ANU's official University Calendar gives it.
+import Layout from "../components/Layout.astro";
+import { CALENDAR_SOURCE, KEY_DATES } from "../lib/anuCalendar";
+import { canberraNow, periodOn } from "../lib/timetable";
+
+const today = canberraNow(new Date()).date;
+const next = KEY_DATES.find((d) => (d.end ?? d.date) >= today);
+const fmt = (d: string) =>
+  new Date(`${d}T00:00:00Z`).toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "long", timeZone: "UTC" });
+const kindText = { term: "Semester", deadline: "Deadline", holiday: "Public holiday", exam: "Exams" };
+---
+
+<Layout title="ANU dates · Semester 2, 2026 · Timetable, sorted" current="timetable">
+  <p><a class="tap" href="/">← My timetable</a></p>
+  <div class="page-head">
+    <div>
+      <h1>Semester 2, 2026 dates</h1>
+      <p class="muted">Today: <span data-period>{periodOn(today)}</span></p>
+    </div>
+  </div>
+  <section class="card">
+    <ol class="date-table">
+      {
+        KEY_DATES.map((d) => {
+          const done = (d.end ?? d.date) < today;
+          return (
+            <li class:list={[`kd-${d.kind}`, { past: done, next: d === next }]} data-date={d.date}>
+              <span class="kd-when">
+                {fmt(d.date)}
+                {d.end && <> – {fmt(d.end)}</>}
+              </span>
+              <span class="kd-title">
+                {d.title}
+                {d === next && <strong> · next</strong>}
+              </span>
+              <span class="kd-kind">{kindText[d.kind]}</span>
+            </li>
+          );
+        })
+      }
+    </ol>
+    <p class="muted">
+      From ANU's <a class="link-target" href={CALENDAR_SOURCE} target="_blank" rel="noopener">University Calendar 2026<span class="visually-hidden"> (opens in a new tab)</span></a>.
+      Classes don't run on public holidays; the timetable and calendar feed leave them out.
+    </p>
+  </section>
+</Layout>
