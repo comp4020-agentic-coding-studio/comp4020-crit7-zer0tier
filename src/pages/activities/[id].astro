@@ -1,0 +1,150 @@
+---
+// One activity's full record, laid out with MyTimetable's own field names
+// so it reads like the source it was copied from. Multi-part activities
+// (TutA/07 = tutorial P1 + drop-in P2) show every part.
+import Layout from "../../components/Layout.astro";
+import { findActivity } from "../../lib/db";
+import {
+  SEMESTER,
+  canberraNow,
+  DAY_NAMES,
+  DAYS,
+  fmt24,
+  fmtDuration,
+  fmtTime,
+  occurrences,
+} from "../../lib/timetable";
+
+const id = String(Astro.params.id ?? "");
+const found = findActivity(id);
+if (!found) return new Response("No such activity", { status: 404 });
+const { view, activity } = found;
+const { course, group } = view;
+
+const title = `${course.code} ${group.label}/${activity.number}`;
+const offering = `${course.code}_S2_1_${course.classNumber}`;
+const held = view.chosen?.id === activity.id;
+const waiting = view.waiting?.id === activity.id;
+const status = held ? "allocated" : waiting ? "pending" : "unallocated";
+const statusText = held ? "Your allocated time" : waiting ? "You're on the wait list" : "Another option in this group";
+const today = canberraNow(new Date()).date;
+const dm = (d: string) => {
+  const [, m, day] = d.split("-");
+  return `${Number(day)}/${Number(m)}`;
+};
+const long = (d: string) =>
+  new Date(`${d}T00:00:00Z`).toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
+---
+
+<Layout title={`${title} · Details · Timetable, sorted`} current="timetable">
+  <p><a class="tap" href="/">← My timetable</a></p>
+  <div class="page-head">
+    <div>
+      <p class="eyebrow">{offering}</p>
+      <h1>{title}</h1>
+      <p class="muted">{course.title} (Class: {course.classNumber})</p>
+    </div>
+    <div class="actions">
+      <span class={`pill ${status}`}>{statusText}</span>
+    </div>
+  </div>
+
+  {
+    activity.source === "mytt" ? (
+      <p class="flash" data-source="mytt">
+        These details are copied from your MyTimetable allocation (23 September 2026).
+      </p>
+    ) : (
+      <p class="flash warn" data-source="illustrative">
+        <strong>Sample data.</strong> This time, room and seat count are illustrative, not from MyTimetable.
+      </p>
+    )
+  }
+
+  <div class="detail-grid">
+    {
+      activity.sessions.map((s) => {
+        const dates = occurrences(s);
+        const past = dates.filter((d) => d < today).length;
+        const upcoming = dates.find((d) => d >= today);
+        return (
+          <section class="card detail" aria-labelledby={`h-${s.id}`} data-session={s.id}>
+            <h2 id={`h-${s.id}`}>
+              {s.activityType}
+              {s.part && <span class="muted"> · part {s.part.slice(1)}</span>}
+            </h2>
+            <dl class="fields">
+              <dt>Activity Type</dt>
+              <dd>{s.activityType}</dd>
+              <dt>Group</dt>
+              <dd>{group.label}</dd>
+              <dt>Activity</dt>
+              <dd>
+                {activity.number}
+                {s.part ? `-${s.part}` : ""}
+              </dd>
+              <dt>Description</dt>
+              <dd>{s.description}</dd>
+              <dt>Day</dt>
+              <dd>
+                {DAYS[s.day - 1]} <span class="muted">({DAY_NAMES[s.day - 1]})</span>
+              </dd>
+              <dt>Time</dt>
+              <dd>
+                {fmt24(s.start)}{" "}
+                <span class="muted">
+                  ({fmtTime(s.start)}–{fmtTime(s.end)})
+                </span>
+              </dd>
+              <dt>Semester</dt>
+              <dd>Second Semester, {SEMESTER.firstDay.slice(0, 4)}</dd>
+              <dt>Campus</dt>
+              <dd>{s.campus}</dd>
+              <dt>Location</dt>
+              <dd>{s.location}</dd>
+              <dt>Staff</dt>
+              <dd>{s.staff === "-" ? <span class="muted">Not listed</span> : s.staff}</dd>
+              <dt>Duration</dt>
+              <dd>{fmtDuration(s.end - s.start)}</dd>
+              <dt>Dates</dt>
+              <dd>{s.dates}</dd>
+              <dt>Seats</dt>
+              <dd>
+                {s.seats}{" "}
+                <span class="muted">{activity.source === "mytt" ? "left, as MyTimetable showed" : "left (sample)"}</span>
+              </dd>
+            </dl>
+            <details class="dates">
+              <summary>
+                All {dates.length} class dates
+                {upcoming ? ` · next ${long(upcoming)}` : " · all finished"}
+              </summary>
+              <p class="muted">
+                {past} done, {dates.length - past} to go.
+              </p>
+              <ol class="date-list">
+                {dates.map((d) => (
+                  <li class:list={{ past: d < today, next: d === upcoming }}>
+                    {long(d)} <span class="visually-hidden">({dm(d)})</span>
+                    {d === upcoming && <strong> · next</strong>}
+                  </li>
+                ))}
+              </ol>
+            </details>
+          </section>
+        );
+      })
+    }
+  </div>
+
+  <div class="actions" style="margin-top:1.25rem">
+    {
+      !group.readOnly && (
+        <a class="button" href={`/courses/${course.code}/#${group.id}`}>
+          {held ? "Change" : "Choose"} {group.label} time
+        </a>
+      )
+    }
+    <a class="button secondary" href={`/courses/${course.code}/`}>All {course.code} activities</a>
+  </div>
+</Layout>

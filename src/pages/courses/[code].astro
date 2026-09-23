@@ -1,7 +1,7 @@
 ---
 import Layout from "../../components/Layout.astro";
-import { clashesFor, getCourse, listGroups, seatsLeft } from "../../lib/db";
-import { fmtSlot } from "../../lib/timetable";
+import { clashesFor, getCourse, listGroups } from "../../lib/db";
+import { fmtSlots } from "../../lib/timetable";
 
 const code = String(Astro.params.code ?? "").toUpperCase();
 const course = getCourse(code);
@@ -16,7 +16,7 @@ const groups = all.filter((g) => g.course.code === code);
   <div class="page-head">
     <div>
       <h1>{course.code} {course.title}</h1>
-      <p class="muted">Class {course.classNumber} · pick one activity in each group. Times shown are illustrative.</p>
+      <p class="muted">Class {course.classNumber} · pick one activity in each group. Times marked Sample are illustrative; the rest are from your MyTimetable.</p>
     </div>
   </div>
 
@@ -29,7 +29,8 @@ const groups = all.filter((g) => g.course.code === code);
         {g.group.readOnly ? (
           <p>
             <span class="pill locked">Read only</span> Allocated by your school:{" "}
-            {g.chosen ? `${fmtSlot(g.chosen)}, ${g.chosen.location}` : "not yet"}.
+            {g.chosen ? `${fmtSlots(g.chosen.sessions)}, ${g.chosen.sessions[0].location}` : "not yet"}.{" "}
+            {g.chosen && <a class="link-target" href={`/activities/${g.chosen.id}/`}>Details<span class="visually-hidden"> of {course.code} {g.group.label}/{g.chosen.number}</span></a>}
           </p>
         ) : (
           <form method="post" action="/api/allocations">
@@ -41,7 +42,7 @@ const groups = all.filter((g) => g.course.code === code);
               <ul class="options">
                 {g.options.map((a) => {
                   const mine = g.chosen?.id === a.id;
-                  const left = seatsLeft(a, mine);
+                  const left = a.seats;
                   const clash = clashesFor(a, all);
                   return (
                     <li>
@@ -49,11 +50,12 @@ const groups = all.filter((g) => g.course.code === code);
                         <input type="radio" name="activity" value={a.id} checked={mine} required />
                         <span class="main">
                           <b>
-                            {g.group.label}/{a.number} · {fmtSlot(a)}
+                            {g.group.label}/{a.number} · {fmtSlots(a.sessions)}
                           </b>
-                          <span class="muted">{a.location}</span>
+                          <span class="muted">{a.sessions[0].location}</span>
+                          {a.source === "illustrative" && <span class="sample-tag">Sample</span>}
                         </span>
-                        <span class="seats">{left > 0 ? `${left} of ${a.capacity} left` : "Full"}</span>
+                        <span class="seats">{left > 0 ? `${left} seat${left === 1 ? "" : "s"} left` : mine ? "Full · you hold one" : "Full"}</span>
                         {mine && <p class="note current">Your current time.</p>}
                         {g.waiting?.id === a.id && <p class="note full">You're on the wait list for this one.</p>}
                         {!mine && left <= 0 && g.waiting?.id !== a.id && (
@@ -62,10 +64,13 @@ const groups = all.filter((g) => g.course.code === code);
                         {clash.length > 0 && (
                           <p class="note clash">
                             Clashes with{" "}
-                            {clash.map((v) => `${v.course.code} ${v.group.label} (${fmtSlot(v.chosen!)})`).join(", ")}
+                            {clash.map((v) => `${v.course.code} ${v.group.label} (${fmtSlots(v.chosen!.sessions)})`).join(", ")}
                           </p>
                         )}
                       </label>
+                      <a class="option-details" href={`/activities/${a.id}/`}>
+                        Details<span class="visually-hidden"> of {course.code} {g.group.label}/{a.number}</span>
+                      </a>
                     </li>
                   );
                 })}

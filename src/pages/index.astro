@@ -9,9 +9,11 @@ import {
   canberraNow,
   clashes,
   fmtSlot,
+  fmtSlots,
   fmtTime,
-  isTeachingDay,
   nextClass,
+  occursOn,
+  shortLocation,
   teachingWeek,
 } from "../lib/timetable";
 
@@ -32,14 +34,28 @@ const counts = {
 };
 const todo = groups.filter((g) => g.status !== "allocated" || g.waiting);
 
-// what goes on the grid: allocated activities, plus wait-listed ones dashed
-const entries = groups.flatMap((g) => {
+// what goes on the grid: every session (part) of each allocated activity,
+// plus wait-listed ones dashed. An entry's `id` is the session's; the
+// activity it belongs to is `activityId`, and the details page is per activity.
+const now = new Date();
+const here = canberraNow(now);
+const week = teachingWeek(here.date);
+// Monday of the week shown: this week, or next week at the weekend
+const monday = addDays(here.date, here.weekday <= 5 ? 1 - here.weekday : 8 - here.weekday);
+const dayDates = DAYS.map((_, i) => addDays(monday, i));
+
+const sessionsOf = groups.flatMap((g) => {
   const out = [];
-  if (g.chosen) out.push({ ...g.chosen, view: g, wait: false });
-  if (g.waiting) out.push({ ...g.waiting, view: g, wait: true });
+  for (const [a, wait] of [[g.chosen, false], [g.waiting, true]] as const) {
+    if (a) for (const s of a.sessions) out.push({ ...s, number: a.number, source: a.source, view: g, wait });
+  }
   return out;
 });
-const allocated = entries.filter((e) => !e.wait);
+// a teaching week shows what runs that week (MyTT's dates skip breaks and
+// holidays); outside teaching weeks the grid shows the weekly pattern
+const entries = sessionsOf.filter((e) => !week || occursOn(e, dayDates[e.day - 1]));
+const notThisWeek = sessionsOf.filter((e) => !entries.includes(e) && !e.wait);
+const allocated = sessionsOf.filter((e) => !e.wait);
 
 // Overlapping events on a day go side by side in lanes (greedy, by start
 // time), so a clash is visible instead of one class hiding the other.
@@ -61,16 +77,10 @@ const laneCount = DAYS.map((_, i) => {
 const clashPairs: [Entry, Entry][] = [];
 for (const a of entries)
   for (const b of entries)
-    if (a !== b && a.id < b.id && !a.wait && !b.wait && clashes(a, b)) clashPairs.push([a, b]);
+    if (a !== b && a.id < b.id && !a.wait && !b.wait && a.activityId !== b.activityId && clashes(a, b))
+      clashPairs.push([a, b]);
 
-const now = new Date();
-const here = canberraNow(now);
 const next = nextClass(allocated, now);
-const week = teachingWeek(here.date);
-
-// Monday of the week shown: this week, or next week at the weekend
-const monday = addDays(here.date, here.weekday <= 5 ? 1 - here.weekday : 8 - here.weekday);
-const dayDates = DAYS.map((_, i) => addDays(monday, i));
 const shortDate = (d: string) =>
   new Date(`${d}T00:00:00Z`).toLocaleDateString("en-AU", { day: "numeric", month: "short", timeZone: "UTC" });
 const longDate = (d: string) =>
@@ -88,17 +98,16 @@ const row = (m: number) => (m - GRID_START) / 30 + 2;
 
 // today view: today if it's a teaching day with classes left, else the day of the next class
 const agendaDate = next?.date ?? here.date;
-const agendaDay = new Date(`${agendaDate}T00:00:00Z`).getUTCDay();
-const agenda = allocated
-  .filter((e) => e.day === agendaDay && isTeachingDay(agendaDate))
-  .sort((a, b) => a.start - b.start);
+const agenda = allocated.filter((e) => occursOn(e, agendaDate)).sort((a, b) => a.start - b.start);
 const agendaIsToday = agendaDate === here.date;
 
-const doneEntry = done ? entries.find((e) => e.id === done) : undefined;
-const waitEntry = waited ? entries.find((e) => e.id === waited) : undefined;
+const doneEntry = done ? sessionsOf.find((e) => e.activityId === done) : undefined;
+const waitEntry = waited ? sessionsOf.find((e) => e.activityId === waited) : undefined;
+const details = (e: { activityId: string }) => `/activities/${e.activityId}/`;
+const kindClass = (e: { activityType: string }) => (e.activityType === "Lecture" ? "kind-lecture" : "kind-tutorial");
 const feedPath = "/calendar.ics";
-const label = (e: { view: { course: { code: string }; group: { label: string } }; number: string }) =>
-  `${e.view.course.code} ${e.view.group.label}/${e.number}`;
+const label = (e: { view: { course: { code: string }; group: { label: string } }; number: string; part: string }) =>
+  `${e.view.course.code} ${e.view.group.label}/${e.number}${e.part ? `-${e.part}` : ""}`;
 ---
 
 <Layout title="My timetable · Timetable, sorted" current="timetable">
@@ -143,10 +152,12 @@ const label = (e: { view: { course: { code: string }; group: { label: string } }
                 {next.date === here.date ? "Today" : longDate(next.date)}, {fmtTime(next.item.start)}
               </p>
               <p>
-                <strong>
-                  {next.item.view.course.code} {next.item.view.group.label}
-                </strong>{" "}
-                {next.item.view.group.kind}
+                <a class="link-target" href={details(next.item)}>
+                  <strong>
+                    {next.item.view.course.code} {next.item.view.group.label}
+                  </strong>{" "}
+                  {next.item.activityType}
+                </a>
               </p>
               <p class="muted">{next.item.location}</p>
             </>
@@ -178,7 +189,7 @@ const label = (e: { view: { course: { code: string }; group: { label: string } }
                     </strong>{" "}
                     {g.group.kind.toLowerCase()} ·{" "}
                     {g.waiting
-                      ? `wait-listed for ${fmtSlot(g.waiting)}`
+                      ? `wait-listed for ${fmtSlots(g.waiting.sessions)}`
                       : "no time chosen yet"}
                   </p>
                   <a class="button" href={`/courses/${g.course.code}/#${g.group.id}`}>
@@ -223,6 +234,7 @@ const label = (e: { view: { course: { code: string }; group: { label: string } }
               <li class="kind-lecture">Lecture</li>
               <li class="kind-tutorial">Tutorial</li>
               <li class="wait-key">Wait list</li>
+              <li class="sample-key">Sample data (illustrative)</li>
             </ul>
             <div class="week" style={`--rows:${rows}`}>
               <div class="gutter" aria-hidden="true">
@@ -244,26 +256,44 @@ const label = (e: { view: { course: { code: string }; group: { label: string } }
                     <div class="day-body" aria-hidden="true" />
                     {items.length === 0 && <p class="empty-day">No classes</p>}
                     {items.map((e) => (
-                      <article
-                        class:list={["event", `kind-${e.view.group.kind.toLowerCase()}`, { wait: e.wait, done: e.id === done, clash: clashing.has(e) }]}
+                      <a
+                        href={details(e)}
+                        class:list={["event", kindClass(e), { wait: e.wait, done: e.activityId === done, clash: clashing.has(e), short: e.end - e.start <= 30, sample: e.source === "illustrative" }]}
                         style={`grid-row:${row(e.start)} / ${row(e.end)};grid-column:${clashing.has(e) ? `${(lanes.get(e) ?? 0) + 1} / span 1` : "1 / -1"}`}
-                        data-activity={e.id}
+                        data-activity={e.activityId}
+                        data-session={e.id}
+                        aria-label={`${label(e)} ${e.activityType}, ${fmtSlot(e)}, ${e.location}${e.wait ? ", wait list" : ""}${e.source === "illustrative" ? ", sample data" : ""}. Details`}
                       >
                         <b>
-                          {e.view.course.code} {e.view.group.label}
+                          {e.view.course.code}{" "}
+                          {e.activityType === "Drop-In Class" ? "drop-in" : e.view.group.label}
                           {e.wait ? " · wait list" : ""}
                         </b>
                         {clashing.has(e) && <span class="clash-tag">Clash</span>}
                         <span>
                           {fmtTime(e.start)}–{fmtTime(e.end)}
-                          <span class="loc"> · {e.location}</span>
+                          <span class="loc"> · {shortLocation(e.location)}</span>
                         </span>
-                      </article>
+                      </a>
                     ))}
                   </section>
                 );
               })}
             </div>
+            {week && notThisWeek.length > 0 && (
+              <p class="muted not-this-week">
+                Not on this week:{" "}
+                {notThisWeek.map((e, i) => (
+                  <>
+                    {i > 0 && ", "}
+                    <a href={details(e)}>
+                      {e.view.course.code} {e.view.group.label}
+                    </a>
+                  </>
+                ))}
+                . Their dates skip it.
+              </p>
+            )}
           </section>
         ) : (
           <section class="card" aria-labelledby="today-h" data-view="today">
@@ -276,16 +306,19 @@ const label = (e: { view: { course: { code: string }; group: { label: string } }
             ) : (
               <ul class="agenda">
                 {agenda.map((e) => (
-                  <li class={`kind-${e.view.group.kind.toLowerCase()}`} data-activity={e.id}>
+                  <li class={kindClass(e)} data-activity={e.activityId}>
                     <span class="t">
                       {fmtTime(e.start)}–{fmtTime(e.end)}
                     </span>
                     <div>
                       <p>
-                        <strong>
-                          {e.view.course.code} {e.view.group.label}
-                        </strong>{" "}
-                        {e.view.group.kind}
+                        <a class="link-target" href={details(e)}>
+                          <strong>
+                            {e.view.course.code} {e.view.group.label}
+                          </strong>{" "}
+                          {e.activityType}
+                        </a>
+                        {e.source === "illustrative" && <span class="sample-tag">Sample</span>}
                       </p>
                       <p>{e.location}</p>
                     </div>

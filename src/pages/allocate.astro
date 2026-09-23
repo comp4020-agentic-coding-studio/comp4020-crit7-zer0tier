@@ -1,7 +1,7 @@
 ---
 import Layout from "../components/Layout.astro";
 import { listCourses, listGroups } from "../lib/db";
-import { SEMESTER, fmtSlot } from "../lib/timetable";
+import { SEMESTER, fmtSlots } from "../lib/timetable";
 
 const courses = listCourses();
 const groups = listGroups();
@@ -32,7 +32,11 @@ const statusText = { allocated: "Allocated", pending: "Wait list", unallocated: 
                 <li data-group={g.group.id} data-status={g.status}>
                   <span>
                     <strong>{g.group.label}</strong> {g.group.kind}
-                    {g.chosen && <span class="muted"> · {fmtSlot(g.chosen)}, {g.chosen.location}</span>}
+                    {g.chosen && (
+                      <span class="muted">
+                        {" "}· <a class="link-target" href={`/activities/${g.chosen.id}/`}>{fmtSlots(g.chosen.sessions)}, {g.chosen.sessions[0].location}</a>
+                      </span>
+                    )}
                   </span>
                   {g.group.readOnly ? (
                     <span class="pill locked">Read only</span>

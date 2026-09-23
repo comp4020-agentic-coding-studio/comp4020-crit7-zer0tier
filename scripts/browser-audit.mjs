@@ -51,7 +51,7 @@ for (let i = 0; ; i++) {
 }
 
 const axeSrc = readFileSync("node_modules/axe-core/axe.min.js", "utf8");
-const routes = ["/?view=week", "/?view=today", "/allocate/", "/courses/COMP3900/", "/courses/PHIL1005/", "/readme/"];
+const routes = ["/?view=week", "/?view=today", "/allocate/", "/courses/COMP3900/", "/courses/PHIL1005/", "/activities/COMP3900-TutA-07/", "/activities/PHIL1005-LecA-01/", "/readme/"];
 const widths = (process.env.WIDTHS ?? "320,390,767,961,1279,1281,1440,1920,2560").split(",").map(Number);
 let failures = 0;
 let pages = 0;
@@ -72,10 +72,23 @@ try {
     await option.locator("xpath=ancestor::form").getByRole("button").click();
     await p.waitForURL(/\/\?view=week/);
   };
-  await choose("COMP3900", "COMP3900-TutA-02");
+  await choose("COMP3900", "COMP3900-TutA-03"); // sample alternative, two parts
   await choose("COMP4020", "COMP4020-TutA-03"); // full: wait list
-  await choose("PHIL1005", "PHIL1005-TutA-03"); // clashes with COMP4020 TutA/02
-  if ((await p.locator(".clash-list").count()) !== 1) fail("flow: clash notice not shown");
+  await choose("PHIL1005", "PHIL1005-TutA-02"); // clashes with the real COMP3900 LecA
+  await p.goto(`${base}/courses/PHIL1005/`);
+  if ((await p.locator('label[data-activity="PHIL1005-TutA-02"] .note.clash').count()) !== 1)
+    fail("flow: clash not warned on the course page");
+  // a real click on a grid event must land on its details page
+  await p.goto(`${base}/?view=week`);
+  const event = p.locator("a.event").first();
+  if ((await event.count()) === 0) fail("flow: no clickable event on the week grid");
+  else {
+    const activity = await event.getAttribute("data-activity");
+    await event.click();
+    await p.waitForURL(new RegExp(`/activities/${activity}/`), { timeout: 5000 }).catch(() => {});
+    if (!p.url().includes(`/activities/${activity}/`)) fail(`flow: clicking ${activity} went to ${p.url()}`);
+    else if ((await p.locator("dl.fields").count()) === 0) fail("flow: details page has no fields");
+  }
   await p.close();
 
   for (const w of widths) {

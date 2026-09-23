@@ -95,22 +95,69 @@ export function teachingWeek(date: string): number | null {
   return date > SEMESTER.breakLast ? week - 2 : week;
 }
 
-export interface Upcoming<T extends Slot> {
+// --- MyTimetable's date ranges ------------------------------------------
+
+export interface Dated extends Slot {
+  dates: string; // "27/7-31/8, 21/9-28/9, 12/10-26/10" (d/m, this semester's year)
+}
+
+const YEAR = SEMESTER.firstDay.slice(0, 4);
+const iso = (dm: string) => {
+  const [d, m] = dm.trim().split("/");
+  return `${YEAR}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+};
+
+/** "27/7-31/8, 21/9-28/9" -> [{from:"2026-07-27",to:"2026-08-31"}, ...]; a lone "5/10" is one day. */
+export function parseDates(dates: string): { from: string; to: string }[] {
+  return dates
+    .split(",")
+    .map((r) => r.trim())
+    .filter(Boolean)
+    .map((r) => {
+      const [a, b] = r.split("-");
+      return { from: iso(a), to: iso(b ?? a) };
+    });
+}
+
+/** Whether a session runs on a date: its weekday, inside one of its ranges. */
+export function occursOn(s: Dated, date: string): boolean {
+  return weekdayOf(date) === s.day && parseDates(s.dates).some((r) => date >= r.from && date <= r.to);
+}
+
+/** Every date a session runs, in order. */
+export function occurrences(s: Dated): string[] {
+  const out: string[] = [];
+  for (const r of parseDates(s.dates)) {
+    for (let d = r.from; d <= r.to; d = addDays(d, 1)) if (weekdayOf(d) === s.day) out.push(d);
+  }
+  return out;
+}
+
+/** 90 -> "1.5 hrs", 60 -> "1 hr", 30 -> "0.5 hr" — MyTT's own wording. */
+export function fmtDuration(minutes: number): string {
+  const h = minutes / 60;
+  return `${h} ${h > 1 ? "hrs" : "hr"}`;
+}
+
+/** 930 -> "15:30", as MyTT prints times. */
+export function fmt24(minutes: number): string {
+  return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+}
+
+export interface Upcoming<T extends Dated> {
   item: T;
   date: string; // Canberra local date of the occurrence
   inProgress: boolean;
 }
 
-/** The next class that hasn't finished yet, from `now`, within the semester. */
-export function nextClass<T extends Slot>(items: T[], now: Date): Upcoming<T> | null {
+/** The next class that hasn't finished yet, from `now`, on the dates it actually runs. */
+export function nextClass<T extends Dated>(items: T[], now: Date): Upcoming<T> | null {
   const here = canberraNow(now);
   for (let offset = 0; offset < 120; offset++) {
     const date = addDays(here.date, offset);
     if (date > SEMESTER.lastDay) return null;
-    if (!isTeachingDay(date)) continue;
-    const day = weekdayOf(date);
     const todays = items
-      .filter((i) => i.day === day && (offset > 0 || i.end > here.minutes))
+      .filter((i) => occursOn(i, date) && (offset > 0 || i.end > here.minutes))
       .sort((a, b) => a.start - b.start);
     if (todays[0]) {
       return {
@@ -125,10 +172,11 @@ export function nextClass<T extends Slot>(items: T[], now: Date): Upcoming<T> | 
 
 // --- iCalendar feed ------------------------------------------------------
 
-export interface CalendarEntry extends Slot {
+export interface CalendarEntry extends Dated {
   uid: string;
   summary: string;
   location: string;
+  description?: string;
 }
 
 const VTIMEZONE = [
@@ -183,24 +231,51 @@ export function toICS(entries: CalendarEntry[], stamp: Date): string {
     ...VTIMEZONE,
   ];
   for (const e of entries) {
-    const first = addDays(SEMESTER.firstDay, e.day - 1);
-    const breakDates = [0, 7].map((w) =>
-      compact(addDays(SEMESTER.breakFirst, w + e.day - 1)),
-    );
-    lines.push(
-      "BEGIN:VEVENT",
-      `UID:${e.uid}`,
-      `DTSTAMP:${dtstamp}`,
-      `DTSTART;TZID=${TZ}:${compact(first)}T${hhmm(e.start)}`,
-      `DTEND;TZID=${TZ}:${compact(first)}T${hhmm(e.end)}`,
-      // last day 30 Oct, 23:59 AEDT (+11) is 12:59 UTC
-      `RRULE:FREQ=WEEKLY;UNTIL=${compact(SEMESTER.lastDay)}T125900Z`,
-      `EXDATE;TZID=${TZ}:${breakDates.map((d) => `${d}T${hhmm(e.start)}`).join(",")}`,
-      `SUMMARY:${escapeText(e.summary)}`,
-      `LOCATION:${escapeText(e.location)}`,
-      "END:VEVENT",
-    );
+    // one weekly event per MyTT date range, so breaks and holidays that
+    // MyTT leaves out stay out
+    parseDates(e.dates).forEach((r, i) => {
+      let first = r.from;
+      while (weekdayOf(first) !== e.day && first < r.to) first = addDays(first, 1);
+      if (weekdayOf(first) !== e.day) return;
+      lines.push(
+        "BEGIN:VEVENT",
+        `UID:${i}-${e.uid}`,
+        `DTSTAMP:${dtstamp}`,
+        `DTSTART;TZID=${TZ}:${compact(first)}T${hhmm(e.start)}`,
+        `DTEND;TZID=${TZ}:${compact(first)}T${hhmm(e.end)}`,
+        // UNTIL is UTC; 23:59:59Z on the last day is still before the
+        // following week's class, so the last day is included and no more
+        `RRULE:FREQ=WEEKLY;UNTIL=${compact(r.to)}T235959Z`,
+        `SUMMARY:${escapeText(e.summary)}`,
+        `LOCATION:${escapeText(e.location)}`,
+        ...(e.description ? [`DESCRIPTION:${escapeText(e.description)}`] : []),
+        "END:VEVENT",
+      );
+    });
   }
   lines.push("END:VCALENDAR");
   return `${lines.map(fold).join("\r\n")}\r\n`;
+}
+
+/** An activity's parts in one line: "Fri 9am–10:30am + Fri 10:30am–11am". */
+export function fmtSlots(slots: Slot[]): string {
+  return slots.map(fmtSlot).join(" + ");
+}
+
+/** Two sessions really clash only if they overlap in time on a date both run. */
+export function clashesOnADate(a: Dated, b: Dated): boolean {
+  if (!clashes(a, b)) return false;
+  return parseDates(a.dates).some((x) => parseDates(b.dates).some((y) => x.from <= y.to && y.from <= x.to));
+}
+
+/**
+ * MyTT locations are "<room>_<building> Bldg <n>". The grid only has room
+ * for enough to find it; the details page shows it all. A bare room number
+ * keeps its building number ("Rm G39_Copland Bldg 24" -> "Rm G39, Bldg 24");
+ * a named room is distinctive alone ("Cinema Rm 1.02_..." -> "Cinema Rm 1.02").
+ */
+export function shortLocation(location: string): string {
+  const [room, building] = location.split("_");
+  const n = building?.match(/Bldg (\w+)/)?.[1];
+  return n && /^Rm\b/.test(room) ? `${room}, Bldg ${n}` : room;
 }

@@ -479,3 +479,54 @@ details.notices li { margin-bottom: 0.4rem; }
 }
 [data-changed] { position: fixed; left: 1rem; right: 1rem; bottom: 1rem; max-width: 30rem; margin: 0 auto; z-index: 20; }
 .tap { display: inline-flex; align-items: center; min-height: 2.75rem; }
+
+/* grid events are links to their details page */
+a.event { display: block; text-decoration: none; }
+a.event:hover { background: var(--white); outline: 2px solid var(--black); outline-offset: -2px; }
+a.event.wait:hover { background: var(--tint); }
+.sample-tag {
+  display: inline-block !important;
+  margin-left: 0.3rem;
+  padding: 0 0.35rem;
+  border: 1px dashed var(--unigrey);
+  color: var(--unigrey);
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--white);
+}
+.event .sample-tag { margin: 0.15rem 0 0; }
+.not-this-week { margin: 0.75rem 0 0; font-size: 0.9rem; }
+
+/* details page */
+.detail-grid { display: grid; gap: 1.25rem; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 64rem) { .detail-grid:has(> .detail + .detail) { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.detail { border-top: 4px solid var(--gold); }
+.fields { display: grid; grid-template-columns: 9rem minmax(0, 1fr); margin: 0; }
+.fields dt, .fields dd { padding: 0.45rem 0; border-bottom: 1px solid var(--line); margin: 0; }
+.fields dt { font-weight: 700; padding-right: 1rem; }
+.fields dd { overflow-wrap: anywhere; }
+@media (max-width: 30rem) {
+  .fields { grid-template-columns: minmax(0, 1fr); }
+  .fields dt { border-bottom: 0; padding-bottom: 0; }
+}
+details.dates { margin-top: 0.75rem; }
+details.dates summary { cursor: pointer; font-weight: 600; min-height: 2.75rem; display: flex; align-items: center; }
+.date-list { columns: 2; margin: 0; padding-left: 1.5rem; }
+.date-list li { padding: 0.1rem 0; }
+.date-list li.past { color: var(--unigrey); }
+.options > li { display: grid; gap: 0.1rem; }
+.option-details { justify-self: end; display: inline-flex; align-items: center; min-height: 2rem; padding: 0 0.25rem; font-size: 0.9rem; }
+.link-target { display: inline-block; padding-block: 0.25rem; }
+/* 30-minute sessions (drop-ins) show their name only; time and room are
+   a click away on the details page */
+@media (min-width: 60rem) {
+  .event.short { padding-block: 0.05rem; font-size: 0.75rem; }
+  .event.short b { font-size: 0.75rem; }
+  .event.short > span:not(.clash-tag) { display: none; }
+}
+/* sample (illustrative) sessions: hatched, so they never pass for MyTT's */
+.event.sample, .legend .sample-key::before {
+  background-image: repeating-linear-gradient(135deg, transparent 0 6px, rgba(0, 0, 0, 0.07) 6px 8px);
+}
+.legend .sample-key::before { border-left-color: var(--unigrey); }
+@media (min-width: 60rem) { .event.clash { padding-block: 0.1rem; } }
