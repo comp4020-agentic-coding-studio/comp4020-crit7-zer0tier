@@ -1,0 +1,61 @@
+---
+import "../styles.css";
+
+interface Props {
+  title: string;
+  current?: "timetable" | "allocate" | "about";
+}
+const { title, current } = Astro.props;
+const links = [
+  { href: "/", label: "My timetable", key: "timetable" },
+  { href: "/allocate/", label: "Choose times", key: "allocate" },
+  { href: "/readme/", label: "About", key: "about" },
+] as const;
+---
+
+<!doctype html>
+<html lang="en-AU">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content="Your ANU class timetable, one tap away: this week's classes, what's next, and the times still to choose." />
+    <meta name="theme-color" content="#16325c" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/icon-180.png" />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="site">
+      <div class="site-inner">
+        <a class="brand" href="/">
+          <span class="brand-mark" aria-hidden="true">TT</span>
+          <span>Timetable, sorted</span>
+        </a>
+        <nav aria-label="Main">
+          <ul>
+            {
+              links.map((l) => (
+                <li>
+                  <a href={l.href} aria-current={current === l.key ? "page" : undefined}>
+                    {l.label}
+                  </a>
+                </li>
+              ))
+            }
+          </ul>
+        </nav>
+      </div>
+    </header>
+    <main id="main" tabindex="-1">
+      <slot />
+    </main>
+    <footer class="site-foot">
+      <p>
+        A COMP4020 student prototype redesigning ANU MyTimetable. Not an ANU
+        service. Class times and rooms are illustrative sample data.
+      </p>
+    </footer>
+  </body>
+</html>

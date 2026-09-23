@@ -1,0 +1,88 @@
+---
+import Layout from "../../components/Layout.astro";
+import { clashesFor, getCourse, listGroups, seatsLeft } from "../../lib/db";
+import { fmtSlot } from "../../lib/timetable";
+
+const code = String(Astro.params.code ?? "").toUpperCase();
+const course = getCourse(code);
+if (!course) return new Response("No such course", { status: 404 });
+
+const all = listGroups();
+const groups = all.filter((g) => g.course.code === code);
+---
+
+<Layout title={`${course.code} · Choose times · Timetable, sorted`} current="allocate">
+  <p><a class="tap" href="/allocate/">← All courses</a></p>
+  <div class="page-head">
+    <div>
+      <h1>{course.code} {course.title}</h1>
+      <p class="muted">Class {course.classNumber} · pick one activity in each group. Times shown are illustrative.</p>
+    </div>
+  </div>
+
+  {
+    groups.map((g) => (
+      <section class="card group-block" id={g.group.id} aria-labelledby={`h-${g.group.id}`}>
+        <h2 id={`h-${g.group.id}`}>
+          {g.group.label} <span class="muted" style="font-weight:400">{g.group.kind}</span>
+        </h2>
+        {g.group.readOnly ? (
+          <p>
+            <span class="pill locked">Read only</span> Allocated by your school:{" "}
+            {g.chosen ? `${fmtSlot(g.chosen)}, ${g.chosen.location}` : "not yet"}.
+          </p>
+        ) : (
+          <form method="post" action="/api/allocations">
+            <input type="hidden" name="group" value={g.group.id} />
+            <fieldset style="border:0;margin:0;padding:0">
+              <legend class="visually-hidden">
+                {course.code} {g.group.label} times
+              </legend>
+              <ul class="options">
+                {g.options.map((a) => {
+                  const mine = g.chosen?.id === a.id;
+                  const left = seatsLeft(a, mine);
+                  const clash = clashesFor(a, all);
+                  return (
+                    <li>
+                      <label class="option" data-activity={a.id}>
+                        <input type="radio" name="activity" value={a.id} checked={mine} required />
+                        <span class="main">
+                          <b>
+                            {g.group.label}/{a.number} · {fmtSlot(a)}
+                          </b>
+                          <span class="muted">{a.location}</span>
+                        </span>
+                        <span class="seats">{left > 0 ? `${left} of ${a.capacity} left` : "Full"}</span>
+                        {mine && <p class="note current">Your current time.</p>}
+                        {g.waiting?.id === a.id && <p class="note full">You're on the wait list for this one.</p>}
+                        {!mine && left <= 0 && g.waiting?.id !== a.id && (
+                          <p class="note full">Full. Choosing it puts you on the wait list, and keeps any seat you already hold.</p>
+                        )}
+                        {clash.length > 0 && (
+                          <p class="note clash">
+                            Clashes with{" "}
+                            {clash.map((v) => `${v.course.code} ${v.group.label} (${fmtSlot(v.chosen!)})`).join(", ")}
+                          </p>
+                        )}
+                      </label>
+                    </li>
+                  );
+                })}
+              </ul>
+            </fieldset>
+            <div class="actions">
+              <button class="button">Save {g.group.label}</button>
+            </div>
+          </form>
+        )}
+        {g.waiting && (
+          <form method="post" action="/api/waitlist" class="actions" style="margin-top:0.75rem">
+            <input type="hidden" name="group" value={g.group.id} />
+            <button class="button secondary">Leave the wait list for {g.group.label}/{g.waiting.number}</button>
+          </form>
+        )}
+      </section>
+    ))
+  }
+</Layout>

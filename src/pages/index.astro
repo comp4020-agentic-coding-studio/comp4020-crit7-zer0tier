@@ -1,53 +1,379 @@
 ---
-import { listMessages } from "../lib/db";
-import "../styles.css";
+import Layout from "../components/Layout.astro";
+import { type HomeView, getHomeView, listGroups } from "../lib/db";
+import {
+  DAY_NAMES,
+  DAYS,
+  SEMESTER,
+  addDays,
+  canberraNow,
+  clashes,
+  fmtSlot,
+  fmtTime,
+  isTeachingDay,
+  nextClass,
+  teachingWeek,
+} from "../lib/timetable";
 
-const messages = listMessages();
+const url = Astro.url;
+const saved = getHomeView();
+const asked = url.searchParams.get("view");
+const view: HomeView = asked === "week" || asked === "today" ? asked : saved;
+const done = url.searchParams.get("done");
+const waited = url.searchParams.get("waitlisted");
+const savedView = url.searchParams.get("saved");
+
+const groups = listGroups();
+const counts = {
+  allocated: groups.filter((g) => g.status === "allocated").length,
+  // wait-list requests, whether or not a seat is already held in the group
+  pending: groups.filter((g) => g.waiting).length,
+  unallocated: groups.filter((g) => g.status === "unallocated").length,
+};
+const todo = groups.filter((g) => g.status !== "allocated" || g.waiting);
+
+// what goes on the grid: allocated activities, plus wait-listed ones dashed
+const entries = groups.flatMap((g) => {
+  const out = [];
+  if (g.chosen) out.push({ ...g.chosen, view: g, wait: false });
+  if (g.waiting) out.push({ ...g.waiting, view: g, wait: true });
+  return out;
+});
+const allocated = entries.filter((e) => !e.wait);
+
+// Overlapping events on a day go side by side in lanes (greedy, by start
+// time), so a clash is visible instead of one class hiding the other.
+type Entry = (typeof entries)[number];
+const lanes = new Map<Entry, number>();
+const clashing = new Set<Entry>();
+const laneCount = DAYS.map((_, i) => {
+  const day = entries.filter((e) => e.day === i + 1).sort((a, b) => a.start - b.start);
+  const laneEnds: number[] = [];
+  for (const e of day) {
+    for (const o of day) if (o !== e && clashes(o, e)) clashing.add(e);
+    let lane = laneEnds.findIndex((end) => end <= e.start);
+    if (lane === -1) lane = laneEnds.push(0) - 1;
+    laneEnds[lane] = e.end;
+    lanes.set(e, lane);
+  }
+  return Math.max(1, laneEnds.length);
+});
+const clashPairs: [Entry, Entry][] = [];
+for (const a of entries)
+  for (const b of entries)
+    if (a !== b && a.id < b.id && !a.wait && !b.wait && clashes(a, b)) clashPairs.push([a, b]);
+
+const now = new Date();
+const here = canberraNow(now);
+const next = nextClass(allocated, now);
+const week = teachingWeek(here.date);
+
+// Monday of the week shown: this week, or next week at the weekend
+const monday = addDays(here.date, here.weekday <= 5 ? 1 - here.weekday : 8 - here.weekday);
+const dayDates = DAYS.map((_, i) => addDays(monday, i));
+const shortDate = (d: string) =>
+  new Date(`${d}T00:00:00Z`).toLocaleDateString("en-AU", { day: "numeric", month: "short", timeZone: "UTC" });
+const longDate = (d: string) =>
+  new Date(`${d}T00:00:00Z`).toLocaleDateString("en-AU", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    timeZone: "UTC",
+  });
+
+const GRID_START = 8 * 60;
+const GRID_END = 19 * 60;
+const rows = (GRID_END - GRID_START) / 30;
+const row = (m: number) => (m - GRID_START) / 30 + 2;
+
+// today view: today if it's a teaching day with classes left, else the day of the next class
+const agendaDate = next?.date ?? here.date;
+const agendaDay = new Date(`${agendaDate}T00:00:00Z`).getUTCDay();
+const agenda = allocated
+  .filter((e) => e.day === agendaDay && isTeachingDay(agendaDate))
+  .sort((a, b) => a.start - b.start);
+const agendaIsToday = agendaDate === here.date;
+
+const doneEntry = done ? entries.find((e) => e.id === done) : undefined;
+const waitEntry = waited ? entries.find((e) => e.id === waited) : undefined;
+const feedPath = "/calendar.ics";
+const label = (e: { view: { course: { code: string }; group: { label: string } }; number: string }) =>
+  `${e.view.course.code} ${e.view.group.label}/${e.number}`;
 ---
 
-<!doctype html>
-<html lang="en-AU">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>COMP4020 prototype</title>
-  </head>
-  <body>
-    <nav aria-label="site">
-      <a href="/">Guestbook</a>
-      <a href="/readme/">About</a>
-    </nav>
-    <main>
-      <h1>Guestbook</h1>
-      <p>
-        A minimal full-stack starter: messages live in SQLite on the machine's
-        volume (state survives a reload and a redeploy), and new messages
-        appear in every open tab over a server-sent-events stream — open this
-        page twice and sign it in one. Replace all of this with your own
-        prototype.
+<Layout title="My timetable · Timetable, sorted" current="timetable">
+  {
+    doneEntry && (
+      <p class="flash" role="status">
+        Allocated to <strong>{label(doneEntry)}</strong>, {fmtSlot(doneEntry)}. It's highlighted below.
       </p>
-      <form method="post" action="/api/messages">
-        <label for="body">Leave a message</label>
-        <input id="body" name="body" required maxlength="500" />
-        <button>Sign</button>
-      </form>
-      <ul id="messages">
-        {messages.map((message) => <li>{message.body}</li>)}
-      </ul>
-    </main>
-    <script>
-      // The live half of the demo: subscribe to the SSE stream and prepend
-      // messages as they arrive. The form itself needs none of this — its
-      // POST + redirect re-renders the submitting tab from SQLite; this
-      // stream is how every other tab finds out.
-      const list = document.querySelector("#messages");
-      const source = new EventSource("/api/events");
-      source.addEventListener("message", (event) => {
-        const message = JSON.parse(event.data);
-        const item = document.createElement("li");
-        item.textContent = message.body;
-        list?.prepend(item);
-      });
-    </script>
-  </body>
-</html>
+    )
+  }
+  {
+    waitEntry && (
+      <p class="flash warn" role="status">
+        <strong>{label(waitEntry)}</strong> is full, so you're on its wait list. Any seat you already
+        held in {waitEntry.view.group.label} is kept.
+      </p>
+    )
+  }
+  {savedView && <p class="flash" role="status">Saved. This page now opens to {saved === "today" ? "Today" : "This week"}.</p>}
+
+  <div class="page-head">
+    <div>
+      <h1>My timetable</h1>
+      <p class="muted">
+        {SEMESTER.name} · {week ? `Teaching week ${week}` : "Not a teaching week"} · {longDate(here.date)}
+      </p>
+    </div>
+    <nav class="tabs" aria-label="Timetable view">
+      <a href="/?view=week" aria-current={view === "week" ? "page" : undefined}>This week</a>
+      <a href="/?view=today" aria-current={view === "today" ? "page" : undefined}>Today</a>
+    </nav>
+  </div>
+
+  <div class="layout">
+    <div class="stack">
+      <section class="card next" aria-labelledby="next-h">
+        <h2 id="next-h" class="eyebrow">{next?.inProgress ? "On now" : "Next class"}</h2>
+        {
+          next ? (
+            <>
+              <p class="when">
+                {next.date === here.date ? "Today" : longDate(next.date)}, {fmtTime(next.item.start)}
+              </p>
+              <p>
+                <strong>
+                  {next.item.view.course.code} {next.item.view.group.label}
+                </strong>{" "}
+                {next.item.view.group.kind}
+              </p>
+              <p class="muted">{next.item.location}</p>
+            </>
+          ) : (
+            <p>No more classes this semester.</p>
+          )
+        }
+      </section>
+
+      <section aria-labelledby="status-h">
+        <h2 id="status-h" class="eyebrow">Allocation status</h2>
+        <div class="status">
+          <a class="ok" href="/allocate/"><strong>{counts.allocated}</strong> Allocated</a>
+          <a class="warn" href="/allocate/" data-count="pending"><strong>{counts.pending}</strong> On a wait list</a>
+          <a class="bad" href="/allocate/"><strong>{counts.unallocated}</strong> Still to choose</a>
+        </div>
+      </section>
+
+      {
+        todo.length > 0 && (
+          <section class="card" aria-labelledby="todo-h">
+            <h2 id="todo-h">Still to do</h2>
+            <ul class="todo">
+              {todo.map((g) => (
+                <li data-group={g.group.id} data-status={g.status}>
+                  <p>
+                    <strong>
+                      {g.course.code} {g.group.label}
+                    </strong>{" "}
+                    {g.group.kind.toLowerCase()} ·{" "}
+                    {g.waiting
+                      ? `wait-listed for ${fmtSlot(g.waiting)}`
+                      : "no time chosen yet"}
+                  </p>
+                  <a class="button" href={`/courses/${g.course.code}/#${g.group.id}`}>
+                    Choose a time<span class="visually-hidden"> for {g.course.code} {g.group.label}</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )
+      }
+
+      {
+        view === "week" ? (
+          <section class="card week-wrap" aria-labelledby="week-h" data-view="week">
+            <h2 id="week-h">
+              {week ? `Week ${week}` : "Your weekly pattern"}
+              <span class="muted" style="font-weight:400">
+                {" "}
+                · {shortDate(dayDates[0])} – {shortDate(dayDates[4])}
+              </span>
+            </h2>
+            {!week && (
+              <p class="muted">
+                No classes run this week ({here.date >= SEMESTER.breakFirst && here.date <= SEMESTER.breakLast ? "teaching break" : "outside the semester"}); this is your weekly pattern.
+              </p>
+            )}
+            {clashPairs.length > 0 && (
+              <ul class="clash-list" role="list">
+                {clashPairs.map(([a, b]) => (
+                  <li>
+                    <strong>Clash:</strong> {label(a)} ({fmtSlot(a)}, {a.location}) overlaps {label(b)} (
+                    {fmtSlot(b)}, {b.location}).{" "}
+                    <a href={`/courses/${(a.view.group.readOnly ? b : a).view.course.code}/#${(a.view.group.readOnly ? b : a).view.group.id}`}>
+                      Change {(a.view.group.readOnly ? b : a).view.course.code} {(a.view.group.readOnly ? b : a).view.group.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div class="week" style={`--rows:${rows}`}>
+              <div class="gutter" aria-hidden="true">
+                {Array.from({ length: rows / 2 }, (_, i) => (
+                  <span class="time" style={`grid-row:${2 + i * 2}`}>
+                    {fmtTime(GRID_START + i * 60)}
+                  </span>
+                ))}
+              </div>
+              {DAYS.map((d, i) => {
+                const items = entries.filter((e) => e.day === i + 1).sort((a, b) => a.start - b.start);
+                const isToday = dayDates[i] === here.date;
+                return (
+                  <section class:list={["day", { "is-today": isToday }]} style={`--lanes:${laneCount[i]}`} aria-label={`${DAY_NAMES[i]} ${shortDate(dayDates[i])}`}>
+                    <h3 class:list={["day-head", { today: isToday }]}>
+                      {d} <span class="date">{shortDate(dayDates[i])}</span>
+                    </h3>
+                    <div class="day-body" aria-hidden="true" />
+                    {items.length === 0 && <p class="empty-day">No classes</p>}
+                    {items.map((e) => (
+                      <article
+                        class:list={["event", `hue-${e.view.course.hue}`, { wait: e.wait, done: e.id === done, clash: clashing.has(e) }]}
+                        style={`grid-row:${row(e.start)} / ${row(e.end)};grid-column:${clashing.has(e) ? `${(lanes.get(e) ?? 0) + 1} / span 1` : "1 / -1"}`}
+                        data-activity={e.id}
+                      >
+                        <b>
+                          {e.view.course.code} {e.view.group.label}
+                          {e.wait ? " · wait list" : ""}
+                        </b>
+                        {clashing.has(e) && <span class="clash-tag">Clash</span>}
+                        <span>
+                          {fmtTime(e.start)}–{fmtTime(e.end)}
+                          <span class="loc"> · {e.location}</span>
+                        </span>
+                      </article>
+                    ))}
+                  </section>
+                );
+              })}
+            </div>
+          </section>
+        ) : (
+          <section class="card" aria-labelledby="today-h" data-view="today">
+            <h2 id="today-h">{agendaIsToday ? "Today" : `Next class day: ${longDate(agendaDate)}`}</h2>
+            {agendaIsToday ? null : (
+              <p class="muted">Nothing left today, so this shows the day of your next class.</p>
+            )}
+            {agenda.length === 0 ? (
+              <p>No classes to show.</p>
+            ) : (
+              <ul class="agenda">
+                {agenda.map((e) => (
+                  <li class={`hue-${e.view.course.hue}`} data-activity={e.id}>
+                    <span class="t">
+                      {fmtTime(e.start)}–{fmtTime(e.end)}
+                    </span>
+                    <div>
+                      <p>
+                        <strong>
+                          {e.view.course.code} {e.view.group.label}
+                        </strong>{" "}
+                        {e.view.group.kind}
+                      </p>
+                      <p>{e.location}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        )
+      }
+    </div>
+
+    <aside class="stack" aria-label="Quick access">
+      <section class="card quick" aria-labelledby="quick-h">
+        <h2 id="quick-h">Quick access</h2>
+        <p class="muted">Three ways to get here without hunting through menus.</p>
+
+        <section>
+          <h3>Open straight to your view</h3>
+          <form method="post" action="/api/preferences">
+            <fieldset>
+              <legend>This page opens to:</legend>
+              <label class="choice">
+                <input type="radio" name="homeView" value="week" checked={saved === "week"} /> This week
+              </label>
+              <label class="choice">
+                <input type="radio" name="homeView" value="today" checked={saved === "today"} /> Today
+              </label>
+            </fieldset>
+            <button class="button secondary">Save</button>
+          </form>
+        </section>
+
+        <section>
+          <h3>Put it on your phone</h3>
+          <p>
+            Bookmark this page, or use your browser's <strong>Add to Home Screen</strong> (iPhone:
+            Share menu; Android: ⋮ menu). It opens like an app, straight to your timetable.
+          </p>
+        </section>
+
+        <section>
+          <h3>Subscribe in your calendar</h3>
+          <p>
+            Paste this into Google Calendar, Outlook or Apple Calendar. It carries every allocated class
+            for the semester and skips the teaching break.
+          </p>
+          <div class="copy-row">
+            <label for="feed" class="visually-hidden">Calendar subscription URL</label>
+            <input id="feed" readonly value={new URL(feedPath, url).href} data-feed />
+            <button class="button" type="button" data-copy hidden>Copy</button>
+          </div>
+          <p><a class="tap" href={feedPath}>Download the .ics file</a></p>
+        </section>
+      </section>
+
+      <details class="card notices">
+        <summary>Notices from MyTimetable</summary>
+        <ul>
+          <li>MyTT closes for 1 hour on Wed 14 Oct for its annual upgrade (time TBA).</li>
+          <li>Drop-in sessions don't need allocating and won't block other activities.</li>
+          <li>Read-only activities are allocated by your school. Contact your convener if one looks wrong.</li>
+        </ul>
+        <p class="muted">Summarised from the MyTimetable 2026 home page notice.</p>
+      </details>
+    </aside>
+  </div>
+
+  <p class="flash warn" data-changed hidden role="status">
+    Your timetable changed in another tab. <a href="/">Refresh to see it</a>.
+  </p>
+</Layout>
+
+<script>
+  // Copy the calendar feed URL. The button stays hidden without JS or a
+  // clipboard, so there's never a button that does nothing.
+  const button = document.querySelector<HTMLButtonElement>("[data-copy]");
+  const feed = document.querySelector<HTMLInputElement>("[data-feed]");
+  if (button && feed && navigator.clipboard) {
+    button.hidden = false;
+    button.addEventListener("click", async () => {
+      await navigator.clipboard.writeText(feed.value);
+      button.textContent = "Copied";
+      setTimeout(() => (button.textContent = "Copy"), 2000);
+    });
+  }
+  feed?.addEventListener("focus", () => feed.select());
+
+  // Another tab allocated something: say so, don't reload under the reader.
+  // Receiving an event only reveals a banner; it never writes, so it can't
+  // cause another event.
+  const banner = document.querySelector<HTMLElement>("[data-changed]");
+  const source = new EventSource("/api/events");
+  source.addEventListener("message", () => {
+    if (banner) banner.hidden = false;
+  });
+</script>

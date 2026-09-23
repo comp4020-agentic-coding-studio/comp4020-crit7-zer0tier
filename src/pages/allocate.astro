@@ -1,0 +1,55 @@
+---
+import Layout from "../components/Layout.astro";
+import { listCourses, listGroups } from "../lib/db";
+import { SEMESTER, fmtSlot } from "../lib/timetable";
+
+const courses = listCourses();
+const groups = listGroups();
+const statusText = { allocated: "Allocated", pending: "Wait list", unallocated: "Choose a time" };
+---
+
+<Layout title="Choose times · Timetable, sorted" current="allocate">
+  <div class="page-head">
+    <div>
+      <h1>Choose times</h1>
+      <p class="muted">{SEMESTER.name} · every course you're enrolled in, and what's left to choose.</p>
+    </div>
+  </div>
+  <div class="course-list">
+    {
+      courses.map((c) => (
+        <section class={`card course-card hue-${c.hue}`} aria-labelledby={`c-${c.code}`}>
+          <header>
+            <h2 id={`c-${c.code}`}>
+              <span class="code">{c.code}</span> {c.title}
+            </h2>
+            <span class="muted">Class {c.classNumber}</span>
+          </header>
+          <ul class="groups">
+            {groups
+              .filter((g) => g.course.code === c.code)
+              .map((g) => (
+                <li data-group={g.group.id} data-status={g.status}>
+                  <span>
+                    <strong>{g.group.label}</strong> {g.group.kind}
+                    {g.chosen && <span class="muted"> · {fmtSlot(g.chosen)}, {g.chosen.location}</span>}
+                  </span>
+                  {g.group.readOnly ? (
+                    <span class="pill locked">Read only</span>
+                  ) : (
+                    <span class="actions">
+                      <span class={`pill ${g.status}`}>{statusText[g.status]}</span>
+                      <a href={`/courses/${c.code}/#${g.group.id}`}>
+                        {g.chosen ? "Change" : "Choose"}
+                        <span class="visually-hidden"> {c.code} {g.group.label}</span>
+                      </a>
+                    </span>
+                  )}
+                </li>
+              ))}
+          </ul>
+        </section>
+      ))
+    }
+  </div>
+</Layout>
