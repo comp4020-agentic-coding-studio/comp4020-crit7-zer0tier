@@ -10,6 +10,11 @@ export default defineConfig({
   // service needs the native `sharp` package, which isn't installed, so it
   // 500'd every image on /readme/. Passthrough serves the files as they are.
   image: { service: passthroughImageService() },
+  // Bundle drizzle-orm into the server build. Left external, Node resolved
+  // its ~450 files on the first request after a cold boot (~450 ms locally,
+  // more on a freshly started Fly machine). scripts/cold-start.test.ts keeps
+  // better-sqlite3, a native binding, as the only runtime package.
+  vite: { ssr: { noExternal: ["drizzle-orm"] } },
   security: {
     // Fly's proxy terminates TLS, so naming the deploy domain is what lets
     // Astro trust x-forwarded-proto and accept same-origin form POSTs.
