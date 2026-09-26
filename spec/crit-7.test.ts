@@ -217,6 +217,60 @@ describe("core flow: choosing a tutorial time persists", () => {
   });
 });
 
+// The home page closes its event stream while hidden or idle, so the Fly
+// machine can stop. What makes that safe is here: a stream opened *after* a
+// change reports a version the older page didn't render. The closing and
+// reopening itself is browser behaviour (visibility, input), which jsdom
+// can't drive; it was checked in Chromium, see the commit.
+const renderedVersion = async () => {
+  const m = (await page("/")).match(/data-version="([0-9a-f]{12})"/);
+  if (!m) throw new Error("home page renders no data-version");
+  return m[1]!;
+};
+const streamedVersion = async () => {
+  const ac = new AbortController();
+  const res = await fetch(new URL("/api/events", baseUrl), { signal: ac.signal });
+  const reader = res.body!.pipeThrough(new TextDecoderStream()).getReader();
+  let buf = "";
+  try {
+    while (!/^data: .*\n/m.test(buf)) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += value;
+    }
+  } finally {
+    ac.abort();
+  }
+  const m = buf.match(/^data: (.*)$/m);
+  if (!m) throw new Error(`no data event in ${JSON.stringify(buf)}`);
+  return JSON.parse(m[1]!).version as string;
+};
+
+describe("live updates: a tab that stopped listening still learns of a change", () => {
+  const group = "PHIL1005-TutA";
+
+  it("sends the version the page rendered as the stream's first event", async () => {
+    expect(await streamedVersion()).toBe(await renderedVersion());
+  });
+
+  it("reports a new version to a stream opened after a change", async () => {
+    const before = await renderedVersion();
+    expect((await post("/api/allocations", { group, activity: "PHIL1005-TutA-07" })).status).toBe(303);
+    const after = await streamedVersion();
+    expect(after).not.toBe(before);
+    expect(await renderedVersion()).toBe(after);
+    // put the core flow's choice back for the tests after this one
+    expect((await post("/api/allocations", { group, activity: "PHIL1005-TutA-05" })).status).toBe(303);
+    expect(await streamedVersion()).toBe(before);
+  });
+
+  it("keeps the version when a request changes nothing", async () => {
+    const before = await streamedVersion();
+    expect((await post("/api/allocations", { group, activity: "PHIL1005-TutA-05" })).status).toBe(303);
+    expect(await streamedVersion()).toBe(before);
+  });
+});
+
 describe("course summaries: one click to Programs and Courses", () => {
   // the four URLs the student gave, as literals
   const SUMMARY = {

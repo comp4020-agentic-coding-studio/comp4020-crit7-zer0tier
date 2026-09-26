@@ -1,7 +1,7 @@
 ---
 import CourseSummaryLink from "../components/CourseSummaryLink.astro";
 import Layout from "../components/Layout.astro";
-import { type HomeView, getHomeView, listCourses, listGroups } from "../lib/db";
+import { type HomeView, getHomeView, listCourses, listGroups, timetableVersion } from "../lib/db";
 import { holidayOn, upcoming } from "../lib/anuCalendar";
 import {
   DAY_NAMES,
@@ -481,7 +481,7 @@ const label = (e: { view: { course: { code: string }; group: { label: string } }
     </aside>
   </div>
 
-  <p class="flash warn" data-changed hidden role="status">
+  <p class="flash warn" data-changed data-version={timetableVersion()} hidden role="status">
     Your timetable changed in another tab. <a href="/">Refresh to see it</a>.
   </p>
 </Layout>
@@ -504,9 +504,46 @@ const label = (e: { view: { course: { code: string }; group: { label: string } }
   // Another tab allocated something: say so, don't reload under the reader.
   // Receiving an event only reveals a banner; it never writes, so it can't
   // cause another event.
+  //
+  // An open stream is load on the Fly machine, and a machine with any load
+  // never auto-stops, so one forgotten tab would keep it running for good.
+  // So the stream is open only while this tab is visible and in use: it
+  // closes when hidden or after IDLE_MS without input, and reopens on the
+  // next visit or input. Each (re)connect's first event carries the current
+  // version; if it isn't the one this page rendered, something changed while
+  // nobody was listening, and the banner shows.
+  const IDLE_MS = 10 * 60_000;
   const banner = document.querySelector<HTMLElement>("[data-changed]");
-  const source = new EventSource("/api/events");
-  source.addEventListener("message", () => {
-    if (banner) banner.hidden = false;
-  });
+  const rendered = banner?.dataset.version;
+  let source: EventSource | null = null;
+  let idle: ReturnType<typeof setTimeout> | undefined;
+
+  const disconnect = () => {
+    source?.close();
+    source = null;
+  };
+  const connect = () => {
+    // once the banner is up the page is known to be stale; nothing to wait for
+    if (source || !banner || !banner.hidden || document.visibilityState !== "visible") return;
+    source = new EventSource("/api/events");
+    source.addEventListener("message", (e) => {
+      if (JSON.parse(e.data).version === rendered) return;
+      banner.hidden = false;
+      disconnect();
+    });
+  };
+  const active = () => {
+    clearTimeout(idle);
+    idle = setTimeout(disconnect, IDLE_MS);
+    connect();
+  };
+
+  document.addEventListener("visibilitychange", () =>
+    document.visibilityState === "visible" ? active() : disconnect(),
+  );
+  // capture, so a handler that stops propagation can't hide input from this
+  for (const type of ["pointerdown", "pointermove", "keydown", "scroll", "focus"]) {
+    window.addEventListener(type, active, { capture: true, passive: true });
+  }
+  active();
 </script>

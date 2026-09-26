@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import Database from "better-sqlite3";
@@ -100,6 +101,19 @@ export interface GroupView {
   chosen: ActivityView | undefined; // allocated activity
   waiting: ActivityView | undefined; // wait-listed activity
   status: Status;
+}
+
+/**
+ * A fingerprint of the student's choices (allocations and wait list). The
+ * home page renders it, and the event stream sends it on every connect, so
+ * a tab that closed its stream while hidden still learns on reconnect that
+ * something changed meanwhile. Read from the database, not a counter in
+ * memory, so it survives the machine stopping in between.
+ */
+export function timetableVersion(): string {
+  const allocs = db.select({ g: allocations.groupId, a: allocations.activityId }).from(allocations).orderBy(asc(allocations.groupId)).all();
+  const waits = db.select({ g: waitlist.groupId, a: waitlist.activityId }).from(waitlist).orderBy(asc(waitlist.groupId)).all();
+  return createHash("sha256").update(JSON.stringify([allocs, waits])).digest("hex").slice(0, 12);
 }
 
 /** Every group with its options and current allocation, in course order. */
