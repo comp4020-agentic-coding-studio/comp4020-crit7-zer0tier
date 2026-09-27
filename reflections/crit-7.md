@@ -2,12 +2,16 @@
 
 **What was the breakthrough that moved the work forward?**
 
-Deciding that the home page should *be* the timetable. My complaint about
-MyTimetable was never that a feature was missing. The complaint was that
-the thing I open it for sits behind a tab, under a wall of notices, with the
-calendar link at the very bottom. Once "quick access" meant "the first screen
-answers where am I next", the rest followed: the saved view, the calendar
-feed and the home-screen install are three routes to that same screen.
+Reconstruction turned out to be the hard part, not redesign. My first
+requests were about making MyTimetable *better* in the abstract, before the
+agent had seen the real system. Once I gave it the actual site, the rebuild
+looked complete but wasn't: clash detection between overlapping classes,
+showing every enrolled class rather than a subset, and flagging ANU's public
+holidays were all missing. A description of "better" and the working system
+aren't the same input, and a plausible-looking rebuild can pass a glance
+while quietly dropping real behaviour. Each gap had to be named and asked
+for by hand, one function at a time, rather than assumed present because
+the layout looked right.
 
 The second breakthrough came from driving the flow in a real browser rather
 than trusting the green spec. Choosing a clashing tutorial made two classes
