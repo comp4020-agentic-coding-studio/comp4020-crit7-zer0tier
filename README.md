@@ -8,7 +8,7 @@ have to choose, and the week at a glance. Choosing a tutorial time is one
 page per course, with seats left and clashes shown before you commit.
 Everything is stored in SQLite, so it survives a reload and a redeploy.
 
-![The home page at desktop width: next class, allocation status, the still-to-do list and the week grid, with the quick-access panel on the right](public/after-week.png)
+![The home page at desktop width: next class, allocation status, the week picker from week 1 to 12 with the teaching break, and the week grid, with quick access and course summaries on the right](public/after-week.webp)
 
 ## What good looks like here
 
@@ -32,7 +32,7 @@ position, and a full class offers the wait list without costing you your
 current seat. At phone width the grid becomes a per-day list rather than a
 table that scrolls sideways.
 
-![The same page at 390px: the week becomes a per-day list](public/after-phone.png)
+![The same page at 390px: the nav wraps, the view toggle, next class and allocation status stack, and the week picker follows](public/after-phone.webp)
 
 **Every class opens its full record.** Click any class on the timetable, in
 Today, in the next-class card or on Choose times. A details page opens with

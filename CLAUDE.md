@@ -461,3 +461,27 @@ objects on every call. So Previous, Next and the current-week highlight
 were all wrong, and every check stayed green until a test asserted the
 week-1 Next link's literal URL. Compare by a key (`w.monday`), and test
 navigation by its literal targets, not only by what's on the page.
+
+### Check what's deployed before measuring it
+
+The "5.5 s cold start" came from the live URL, which was still the
+template's starter guestbook: nothing had been deployed that week. The
+fix was still real (measured locally, ~650 → ~200 ms to first page),
+but the number that motivated it was from a different app. Fetch the
+live page and look for something only this week's app has before
+timing it.
+
+### `curl -I` is a HEAD, and a HEAD can take a different code path
+
+The Node adapter sets `immutable` on `/_astro/` files when it streams a
+body. A HEAD streams none, so `curl -I` showed `max-age=0` and I
+reported a caching bug that didn't exist. Probe headers with
+`curl -s -D - -o /dev/null` (a GET).
+
+### Socket counts include idle keep-alive sockets
+
+Checking that a closed SSE stream released the server, `ss` still
+counted 1–2 sockets: page loads' keep-alive connections, which Node
+drops after 5 s. Wait past `keepAliveTimeout` before counting, or
+the check fails for the wrong reason (and passes for the wrong one
+if the timing shifts).
